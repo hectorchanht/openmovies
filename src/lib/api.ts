@@ -12,9 +12,6 @@ const base = (): string =>
 
 export const apiConfigured = (): boolean => base().length > 0;
 
-/** The API base URL ('' when unconfigured). Used by the resolver layer. */
-export const apiBase = base;
-
 async function call(path: string, init?: RequestInit): Promise<Response | null> {
 	if (!apiConfigured()) return null;
 	try {
@@ -60,30 +57,9 @@ export async function pushRemoteState(token: string, state: PersonalState): Prom
 	return !!res?.ok;
 }
 
-export interface ProviderHealthInfo {
-	id: string;
-	/** `ok` = the Worker's edge probe got a definitive HTTP answer from
-	 * the host. `ok: false` = the probe was inconclusive (it runs from
-	 * Cloudflare's network, a vantage users never have) — it must only
-	 * ever surface as "unverified", never "down". See providerMarker. */
-	ok: boolean;
-	status: number | null;
-	latencyMs: number;
-}
-
-/** Provider health from the Worker (itself edge-cached, failures negative-
- * cached). Best-effort: null when the API is unconfigured or unreachable,
- * in which case the player simply shows no markers. */
-export async function fetchProviderHealth(): Promise<ProviderHealthInfo[] | null> {
-	const res = await call('/providers/health');
-	if (!res || !res.ok) return null;
-	const data = (await res.json().catch(() => null)) as { providers?: ProviderHealthInfo[] } | null;
-	return data?.providers ?? null;
-}
-
 /** Anonymous, aggregate product analytics — what Hector asked for: analysis
  * only, never sold, no third-party trackers. Sends a title id + action +
  * day, nothing personal, and only when the API is configured. */
-export function trackEvent(action: 'play' | 'detail' | 'search' | 'download', titleId?: number): void {
+export function trackEvent(action: 'play' | 'detail' | 'search', titleId?: number): void {
 	void call('/analytics/event', { method: 'POST', body: JSON.stringify({ action, titleId }) });
 }

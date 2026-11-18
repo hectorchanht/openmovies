@@ -26,40 +26,16 @@ npm run check   # svelte-check
 npm run build   # static SPA -> build/
 ```
 
-Env (build-time): `PUBLIC_TMDB_API_KEY`, `PUBLIC_OPENSUBTITLES_API_KEY`
-(optional), and `PUBLIC_API_BASE` — the openmovies-api Worker origin
-(see `worker/`). `PUBLIC_API_BASE` has NO code default: a bundle built
-without it runs API-less (no email sign-in, no Worker resolver cache).
-`scripts/deploy-web.py` always sets it and aborts if the built bundle
-does not contain it — deploy through the script, never by hand.
+Env (build-time, all optional): `PUBLIC_TMDB_API_KEY`,
+`PUBLIC_OPENSUBTITLES_API_KEY`, `PUBLIC_API_BASE`
+(default: the openmovies-api Worker — see `worker/`).
 
 ## Layout
 
 - `src/lib/tmdb.ts` — TMDB adapter + demo fallback
 - `src/lib/providers.ts` — playback provider registry (swap providers here)
-- `src/lib/resolve.ts` — client resolver memo (session + localStorage, 6h)
 - `src/lib/personal.ts` — watched/liked/resume/watchlist logic (pure, tested)
 - `worker/` — auth codes + per-user sync + anonymous analytics API (D1)
-
-## Resolver caching (Cloudflare Cache API, mirroring OpenMusic)
-
-Playback resolution is cached at two layers so repeat plays are instant:
-
-- **Edge (API Worker, `caches.default`)** — `GET /resolve` payloads 6h;
-  `GET /providers/health` probe rounds 5 min, or only 2 min when a provider
-  failed (negative caching: a dead server is never hammered, and the cached
-  "down" answer powers instant failover in the player); `GET /tmdb/:type/:id`
-  metadata 24h with 2-min negative entries on upstream failure. Cache keys
-  are versioned synthetic own-origin URLs built only from anonymous
-  resolver params — no secrets, no per-user data. Responses carry
-  `x-om-cache: HIT | MISS | NEG`.
-- **Client** — `resolve.ts` memoizes in-session and in localStorage for
-  the same 6h; any API failure falls back to the local provider registry,
-  so watching never depends on the API.
 - `src/routes/gateway` — the Built to Move House survival page
 
-## Licence
-
-PolyForm Noncommercial License 1.0.0 — this code is noncommercial
-forever: no one may use it for profit. Commercial use requires
-Dawn Studio acknowledgement.
+License: Apache-2.0 (same as OpenMusic).

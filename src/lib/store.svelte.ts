@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { loadPersonal, markServerSwitched, markWatched, recordDownload, savePersonal, settleFinished, toggleLiked, toggleWatchlist, upsertResume } from './personal';
+import { loadPersonal, markServerSwitched, markWatched, savePersonal, settleFinished, toggleLiked, toggleWatchlist, upsertResume } from './personal';
 import { fetchRemoteState, pushRemoteState } from './api';
 import { emptyPersonal, type PersonalState, type ResumeEntry } from './types';
 
@@ -52,7 +52,6 @@ class AppStore {
 	toggleLiked(id: number) { this.apply(toggleLiked(this.personal, id)); }
 	toggleWatchlist(id: number) { this.apply(toggleWatchlist(this.personal, id)); }
 	markWatched(id: number) { this.apply(markWatched(this.personal, id)); }
-	recordDownload(id: number) { this.apply(recordDownload(this.personal, id)); }
 	recordResume(e: ResumeEntry) { this.apply(upsertResume(this.personal, e)); }
 	noteServerSwitch() { this.apply(markServerSwitched(this.personal)); }
 
@@ -67,7 +66,6 @@ class AppStore {
 					liked: [...new Set([...remote.liked, ...guest.liked])],
 					watchlist: [...new Set([...remote.watchlist, ...guest.watchlist])],
 					watched: [...new Set([...remote.watched, ...guest.watched])],
-					downloads: [...new Set([...(remote.downloads ?? []), ...guest.downloads])],
 					resume: { ...guest.resume, ...remote.resume },
 					flags: { serverSwitched: remote.flags.serverSwitched || guest.flags.serverSwitched }
 				}

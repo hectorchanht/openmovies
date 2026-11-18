@@ -1,45 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { PROVIDERS, parseProgressMessage, providerById, providerMarker } from '$lib/providers';
+	import { PROVIDERS, parseProgressMessage, providerById } from '$lib/providers';
 	import { BUILTIN_TRACKS, searchSubtitles, type SubtitleTrack } from '$lib/subtitles';
-	import { resolveSource } from '$lib/resolve';
-	import { fetchProviderHealth } from '$lib/api';
 	import { store } from '$lib/store.svelte';
 	import { resumeKey } from '$lib/types';
 	import type { Title } from '$lib/types';
 
 	let { title, season = 1, episode = 1 }: { title: Title; season?: number; episode?: number } = $props();
 
-	// Default is EmbedWave (2026-11-20): verified in a real-browser
-	// harness to play inside the exact P0 sandbox with no popup, no
-	// redirect and no sandbox refusal — the first real provider that
-	// satisfies the sandbox contract. The Demo Player is the simulated
-	// fallback (Server 2). Ad-supported servers are opt-in via their
-	// 有廣告 tag unless the user opens Ad Mode (see the iframe below).
-	let providerId = $state('embedwave');
-	// Ad Mode (Hector ruling 2026-11-20, lightest form): the disclosure
-	// is the 有廣告 · Ads tag on the provider chip itself. A user who
-	// taps a tagged provider has knowingly opted in — that tap IS the
-	// consent (see switchTo) — so a selected adSupported provider renders
-	// without the sandbox directly, no notices, dialogs or extra steps.
-	// Ad Mode state follows that selection, is persisted per device and
-	// stays sticky; the visible toggle can switch it back off, which
-	// re-sandboxes everything immediately. embedUnsandboxed below is the
-	// single gate: Ad Mode on AND an ad-supported provider. Clean
-	// providers are sandboxed in every state, and the default selection
-	// is always a clean one.
-	const AD_MODE_KEY = 'om_ad_mode';
-	let adMode = $state(false);
-	const currentProvider = $derived(providerById(providerId));
-	const embedUnsandboxed = $derived(adMode && currentProvider.adSupported);
-	function setAdMode(on: boolean) {
-		adMode = on;
-		try {
-			localStorage.setItem(AD_MODE_KEY, on ? '1' : '0');
-		} catch {
-			/* storage unavailable (private mode etc.) — the mode just won't persist */
-		}
-	}
+	let providerId = $state('vidlink');
 	let tracks = $state<SubtitleTrack[]>(BUILTIN_TRACKS);
 	let track = $state('en');
 	// Demo (simulated) player state
@@ -48,25 +17,8 @@
 	const duration = $derived((title.type === 'movie' ? (title.runtimeMin ?? 100) : 50) * 60);
 	let frame: HTMLIFrameElement | undefined = $state();
 
-	// Embed URL comes from the resolver layer (memoized in-session +
-	// localStorage, backed by the Worker's Cloudflare edge cache) — server
-	// switches and Continue Watching never re-resolve a known source.
-	let src = $state('');
-	$effect(() => {
-		const pid = providerId;
-		const target = { id: title.id, type: title.type, season, episode };
-		const stamp = `${pid}:${target.id}:${target.type}:${season}:${episode}`;
-		void resolveSource(pid, target).then((r) => {
-			if (`${providerId}:${title.id}:${title.type}:${season}:${episode}` === stamp) src = r.embedUrl;
-		});
-	});
-	// Providers the Worker's EDGE health probe could not confirm. The
-	// probe runs from Cloudflare's network, which providers often block
-	// while real devices connect fine — so an unconfirmed probe only
-	// earns a chip "· unverified" marker (see providerMarker). It is
-	// never shown as "down" and never causes a server to be skipped:
-	// servers are tried in listed order.
-	let unconfirmedIds = $state<string[]>([]);
+	const provider = $derived(providerById(providerId));
+	const src = $derived(provider.build({ id: title.id, type: title.type, season, episode }));
 	const key = $derived(resumeKey({ type: title.type, id: title.id, season: title.type === 'tv' ? season : undefined, episode: title.type === 'tv' ? episode : undefined }));
 
 	let lastSave = 0;
@@ -80,27 +32,11 @@
 	function switchTo(id: string) {
 		if (id !== providerId) store.noteServerSwitch();
 		providerId = id;
-		// Tapping a 有廣告-tagged chip IS the opt-in: it turns Ad Mode on
-		// (sticky) so the tagged provider loads unsandboxed right away —
-		// one tap from "can't play" to playing, no separate enable step.
-		if (providerById(id).adSupported) setAdMode(true);
 	}
 
 	onMount(() => {
-		try {
-			adMode = localStorage.getItem(AD_MODE_KEY) === '1';
-		} catch {
-			/* storage unavailable — Ad Mode stays off, the safe default */
-		}
 		const existing = store.personal.resume[key];
 		if (existing) pos = existing.positionSec;
-		void fetchProviderHealth().then((health) => {
-			if (!health) return;
-			// Deliberately NO failover here: an edge-probe failure is not
-			// evidence about this device's reachability, so the selected
-			// server never changes on probe data (see providerMarker).
-			unconfirmedIds = health.filter((p) => !p.ok).map((p) => p.id);
-		});
 		void searchSubtitles({ tmdbId: title.id, type: title.type, season, episode }).then((t) => (tracks = t));
 		const onMsg = (ev: MessageEvent) => {
 			if (!frame?.src) return;
@@ -133,47 +69,24 @@
 			<input class="seek" type="range" min="0" max={duration} value={pos} oninput={(e) => { pos = Number((e.currentTarget as HTMLInputElement).value); save(pos, duration); }} aria-label="Seek" />
 			<p class="small muted">{fmt(pos)} / {fmt(duration)}</p>
 		</div>
-	{:else if src}
-		<!-- Sandbox contract (Hector rulings 2026-11-20): the iframe is
-		     sandboxed with exactly the safe token set below — no
-		     top-navigation token and no popup token of any kind (the
-		     contract test spells them out and fails if one ever appears) —
-		     so the browser itself blocks the popunder / whole-tab ad
-		     redirect an unsandboxed embed served in production. The ONE
-		     exception is Ad Mode: embedUnsandboxed (Ad Mode on AND this
-		     provider is adSupported) is the only path to an iframe without
-		     a sandbox, and it exists because availability outranks
-		     ad-purity — sandboxed, ad-funded providers refuse to play at
-		     all. The key block forces a fresh iframe when the sandbox
-		     state flips, because browsers apply sandbox flags only at
-		     navigation time. -->
-		{#key embedUnsandboxed}
-			<iframe bind:this={frame} title={`Player — ${title.name}`} src={src} sandbox={embedUnsandboxed ? undefined : 'allow-scripts allow-same-origin allow-presentation'} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
-		{/key}
 	{:else}
-		<div class="stage"><p class="muted small">Loading server…</p></div>
+		<iframe bind:this={frame} title={`Player — ${title.name}`} src={src} allowfullscreen referrerpolicy="origin" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
 	{/if}
 </div>
 
 <div class="controls">
 	<div class="servers" role="group" aria-label="Playback server">
 		{#each PROVIDERS as p}
-			<button class="chip" class:on={providerId === p.id} onclick={() => switchTo(p.id)}>{p.label}{providerMarker(p, unconfirmedIds)}</button>
+			<button class="chip" class:on={providerId === p.id} onclick={() => switchTo(p.id)}>{p.label}{#if !p.verified && p.id !== 'demo'} · unverified{/if}</button>
 		{/each}
 	</div>
-	<button class="chip" class:on={adMode} onclick={() => setAdMode(!adMode)} aria-pressed={adMode}>廣告模式 Ad Mode · {adMode ? 'ON' : 'OFF'}</button>
 	<label class="subs small muted">Subtitles
 		<select bind:value={track}>
 			{#each tracks as t}<option value={t.lang}>{t.label}</option>{/each}
 		</select>
 	</label>
 </div>
-{#if currentProvider.adSupported}
-	<p class="small muted">呢個 Server 有廣告：撳 Play 時可能彈廣告，撳一次交叉（X）閂咗佢就得。我哋唔會從呢啲廣告賺錢 — 廣告係 provider 強制顯示，同我哋無關。This server carries ads: a pop-up may appear when you press play — close it once (tap X). We earn nothing from these ads — the provider forces them; they are not ours.</p>
-{:else if currentProvider.note}
-	<p class="small muted">{currentProvider.note}</p>
-{/if}
-<p class="small muted">If a server is slow or down, switch servers — your place is kept. Third-party servers run sandboxed by default, so they can never redirect this tab or open pop-up ads; a server tagged 有廣告 runs unsandboxed only when you select it — that selection is your opt-in. Progress in the Demo Player is saved automatically; other servers keep their own resume.</p>
+<p class="small muted">If a server is slow or down, switch servers — your place is kept. Progress from Server 1 is saved automatically; other servers keep their own resume.</p>
 
 <style>
 	.player { position: relative; aspect-ratio: 16/9; background: #000; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }

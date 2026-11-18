@@ -3,7 +3,6 @@
 	import { page } from '$app/state';
 	import PosterCard from '$lib/components/PosterCard.svelte';
 	import { TmdbCatalog } from '$lib/tmdb';
-	import { downloadOptions } from '$lib/providers';
 	import { trackEvent } from '$lib/api';
 	import { store } from '$lib/store.svelte';
 	import type { Title } from '$lib/types';
@@ -25,15 +24,6 @@
 	const liked = $derived(title ? store.personal.liked.includes(title.id) : false);
 	const listed = $derived(title ? store.personal.watchlist.includes(title.id) : false);
 	const watched = $derived(title ? store.personal.watched.includes(title.id) : false);
-	// Download shows only when a provider really exposes a download URL for
-	// this title (capability flag in the provider registry). Always free.
-	const downloads = $derived(title ? downloadOptions({ id: title.id, type: title.type }) : []);
-	function startDownload() {
-		if (!title || !downloads.length) return;
-		store.recordDownload(title.id);
-		trackEvent('download', title.id);
-		window.open(downloads[0].url, '_blank', 'noopener');
-	}
 </script>
 
 {#if missing}
@@ -50,9 +40,6 @@
 				<a class="btn primary" href={`/watch/${title.id}?type=${title.type}`}>▶ Play</a>
 				<button class="btn" class:on={liked} onclick={() => title && store.toggleLiked(title.id)}>{liked ? '♥ Liked' : '♡ Like'}</button>
 				<button class="btn" class:on={listed} onclick={() => title && store.toggleWatchlist(title.id)}>{listed ? '✓ In My List' : '+ My List'}</button>
-				{#if downloads.length}
-					<button class="btn" onclick={startDownload}>⬇ Download · free</button>
-				{/if}
 				{#if watched}<span class="chip on">✓ Watched</span>{/if}
 			</div>
 		</div>

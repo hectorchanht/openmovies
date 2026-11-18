@@ -16,59 +16,21 @@ export interface Catalog {
 }
 
 type FetchFn = typeof fetch;
-type MediaType = 'movie' | 'tv';
-
-/** TMDB genre id → name map for one media type (from /genre/{type}/list). */
-export type GenreMap = ReadonlyMap<number, string>;
-
-/**
- * Build a genre id→name map from a TMDB /genre/{type}/list payload
- * (`{ genres: [{ id, name }] }`). Pure + defensive: anything malformed
- * yields an empty (or partial) map, never a throw.
- */
-export function genreMapFromList(raw: unknown): Map<number, string> {
-	const map = new Map<number, string>();
-	if (typeof raw !== 'object' || raw === null) return map;
-	const genres = (raw as { genres?: unknown }).genres;
-	if (!Array.isArray(genres)) return map;
-	for (const g of genres as { id?: unknown; name?: unknown }[]) {
-		if (typeof g?.id === 'number' && typeof g?.name === 'string' && g.name) map.set(g.id, g.name);
-	}
-	return map;
-}
 
 const artFor = (i: number): string =>
 	`linear-gradient(135deg, hsl(${(i * 47) % 360} 45% 26%), hsl(${(i * 47 + 60) % 360} 55% 12%))`;
 
-/**
- * Genre names for one TMDB result. Detail responses carry `genres`
- * (objects with names) — those win. List responses (/trending, /search,
- * /top_rated, …) carry only `genre_ids`, which need the genre map
- * (G1 fix, 2026-11-20: without this every live list title mapped to
- * `genres: []` and Browse genre filtering was dead).
- */
-function genresOf(raw: Record<string, unknown>, genreMap?: GenreMap): string[] {
-	if (Array.isArray(raw.genres)) {
-		const names = (raw.genres as { name?: string }[]).map((g) => g.name ?? '').filter(Boolean);
-		if (names.length) return names;
-	}
-	if (Array.isArray(raw.genre_ids) && genreMap) {
-		return (raw.genre_ids as unknown[])
-			.filter((id): id is number => typeof id === 'number')
-			.map((id) => genreMap.get(id) ?? '')
-			.filter(Boolean);
-	}
-	return [];
-}
-
 /** Map one TMDB movie/tv result (or detail) into our Title shape. Pure. */
-export function mapTmdb(raw: Record<string, unknown>, type: MediaType, i = 0, genreMap?: GenreMap): Title {
+export function mapTmdb(raw: Record<string, unknown>, type: 'movie' | 'tv', i = 0): Title {
+	const genres = Array.isArray(raw.genres)
+		? (raw.genres as { name?: string }[]).map((g) => g.name ?? '').filter(Boolean)
+		: [];
 	return {
 		id: Number(raw.id),
 		type,
 		name: String((type === 'movie' ? raw.title : raw.name) ?? raw.title ?? raw.name ?? 'Untitled'),
 		year: Number(String((type === 'movie' ? raw.release_date : raw.first_air_date) ?? '0').slice(0, 4)) || 0,
-		genres: genresOf(raw, genreMap),
+		genres,
 		rating: Math.round(Number(raw.vote_average ?? 0) * 10) / 10,
 		overview: String(raw.overview ?? ''),
 		runtimeMin: typeof raw.runtime === 'number' ? raw.runtime : undefined,
@@ -81,16 +43,7 @@ export function mapTmdb(raw: Record<string, unknown>, type: MediaType, i = 0, ge
 
 export const posterUrl = (t: Title): string | null => (t.posterPath ? `${IMG}${t.posterPath}` : null);
 
-const demoOfType = (type: MediaType): Title[] => DEMO_TITLES.filter((t) => t.type === type);
-const demoTopRated = (type: MediaType): Title[] => [...demoOfType(type)].sort((a, b) => b.rating - a.rating);
-
 export class TmdbCatalog {
-	// Genre id→name maps, fetched once per instance and reused by every
-	// list call (G1). Null until first use; a failed load caches empty
-	// maps so a genre outage degrades to nameless genres, never a crash.
-	private genreMapsCache: Record<MediaType, Map<number, string>> | null = null;
-	private genreMapsLoad: Promise<Record<MediaType, Map<number, string>>> | null = null;
-
 	constructor(
 		private key: string | undefined,
 		private fetchFn: FetchFn = fetch
@@ -106,79 +59,17 @@ export class TmdbCatalog {
 		return res.json();
 	}
 
-	/** Load (once, cached) the movie + TV genre lists. Never throws. */
-	private async genreMaps(): Promise<Record<MediaType, Map<number, string>>> {
-		if (this.genreMapsCache) return this.genreMapsCache;
-		if (!this.key) {
-			this.genreMapsCache = { movie: new Map(), tv: new Map() };
-			return this.genreMapsCache;
-		}
-		this.genreMapsLoad ??= (async () => {
-			const loadOne = async (type: MediaType): Promise<Map<number, string>> => {
-				try {
-					return genreMapFromList(await this.get(`/genre/${type}/list`));
-				} catch {
-					return new Map();
-				}
-			};
-			const maps: Record<MediaType, Map<number, string>> = { movie: await loadOne('movie'), tv: await loadOne('tv') };
-			this.genreMapsCache = maps;
-			return maps;
-		})();
-		return this.genreMapsLoad;
-	}
-
-	/**
-	 * Fetch one TMDB list endpoint and map its results. `fixedType` is
-	 * for type-specific endpoints (/trending/movie/week, /movie/top_rated)
-	 * whose results carry no `media_type`; mixed endpoints (/trending/all)
-	 * filter + map per-result. Returns null on any failure so callers can
-	 * apply their own demo fallback.
-	 */
-	private async fetchList(path: string, fixedType?: MediaType): Promise<Title[] | null> {
-		try {
-			const maps = await this.genreMaps();
-			const data = (await this.get(path)) as { results?: Record<string, unknown>[] };
-			if (!Array.isArray(data.results)) return null;
-			if (fixedType) {
-				return data.results.map((r, i) => mapTmdb(r, fixedType, i, maps[fixedType]));
-			}
-			return data.results
-				.filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
-				.map((r, i) => mapTmdb(r, r.media_type as MediaType, i, maps[r.media_type as MediaType]));
-		} catch {
-			return null;
-		}
-	}
-
 	async trending(): Promise<Catalog> {
 		if (!this.key) return { titles: DEMO_TITLES, source: 'demo' };
-		const titles = await this.fetchList('/trending/all/week');
-		return titles?.length ? { titles, source: 'tmdb' } : { titles: DEMO_TITLES, source: 'demo' };
-	}
-
-	/** Trending movies only (G2: homepage rows are separate real feeds). */
-	async trendingMovies(): Promise<Catalog> {
-		if (!this.key) return { titles: demoOfType('movie'), source: 'demo' };
-		const titles = await this.fetchList('/trending/movie/week', 'movie');
-		return titles?.length ? { titles, source: 'tmdb' } : { titles: demoOfType('movie'), source: 'demo' };
-	}
-
-	/** Trending TV only (G2). */
-	async trendingTv(): Promise<Catalog> {
-		if (!this.key) return { titles: demoOfType('tv'), source: 'demo' };
-		const titles = await this.fetchList('/trending/tv/week', 'tv');
-		return titles?.length ? { titles, source: 'tmdb' } : { titles: demoOfType('tv'), source: 'demo' };
-	}
-
-	/**
-	 * Real TMDB top-rated catalogue for one media type (G2 — replaces the
-	 * old fake "Top Rated" that sorted the shared trending pool client-side).
-	 */
-	async topRated(type: MediaType): Promise<Catalog> {
-		if (!this.key) return { titles: demoTopRated(type), source: 'demo' };
-		const titles = await this.fetchList(`/${type}/top_rated`, type);
-		return titles?.length ? { titles, source: 'tmdb' } : { titles: demoTopRated(type), source: 'demo' };
+		try {
+			const data = (await this.get('/trending/all/week')) as { results: Record<string, unknown>[] };
+			const titles = data.results
+				.filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
+				.map((r, i) => mapTmdb(r, r.media_type as 'movie' | 'tv', i));
+			return titles.length ? { titles, source: 'tmdb' } : { titles: DEMO_TITLES, source: 'demo' };
+		} catch {
+			return { titles: DEMO_TITLES, source: 'demo' };
+		}
 	}
 
 	async search(query: string): Promise<Catalog> {
@@ -192,16 +83,26 @@ export class TmdbCatalog {
 				source: 'demo'
 			};
 		}
-		const titles = await this.fetchList(`/search/multi?query=${encodeURIComponent(query)}`);
-		return titles ? { titles, source: 'tmdb' } : { titles: [], source: 'tmdb' };
+		try {
+			const data = (await this.get(`/search/multi?query=${encodeURIComponent(query)}`)) as {
+				results: Record<string, unknown>[];
+			};
+			return {
+				titles: data.results
+					.filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
+					.map((r, i) => mapTmdb(r, r.media_type as 'movie' | 'tv', i)),
+				source: 'tmdb'
+			};
+		} catch {
+			return { titles: [], source: 'tmdb' };
+		}
 	}
 
-	async detail(id: number, type: MediaType): Promise<Title | null> {
+	async detail(id: number, type: 'movie' | 'tv'): Promise<Title | null> {
 		if (!this.key) return DEMO_TITLES.find((t) => t.id === id && t.type === type) ?? null;
 		try {
-			const maps = await this.genreMaps();
 			const raw = (await this.get(`/${type}/${id}`)) as Record<string, unknown>;
-			const base = mapTmdb(raw, type, 0, maps[type]);
+			const base = mapTmdb(raw, type);
 			const demo = DEMO_TITLES.find((t) => t.id === id && t.type === type);
 			return { ...base, episodes: demo?.episodes };
 		} catch {
@@ -212,8 +113,14 @@ export class TmdbCatalog {
 	/** "Because you watched" — TMDB similar when live; same-genre demo picks otherwise. Pure-ish helper. */
 	async similar(title: Title): Promise<Title[]> {
 		if (this.key) {
-			const titles = await this.fetchList(`/${title.type}/${title.id}/similar`, title.type);
-			if (titles) return titles.slice(0, 8);
+			try {
+				const data = (await this.get(`/${title.type}/${title.id}/similar`)) as {
+					results: Record<string, unknown>[];
+				};
+				return data.results.slice(0, 8).map((r, i) => mapTmdb(r, title.type, i));
+			} catch {
+				/* fall through to genre match */
+			}
 		}
 		return DEMO_TITLES.filter((t) => t.id !== title.id && t.genres.some((g) => title.genres.includes(g))).slice(0, 8);
 	}

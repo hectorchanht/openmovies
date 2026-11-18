@@ -45,8 +45,6 @@ export interface PersonalState {
 	liked: number[];
 	watchlist: number[];
 	watched: number[];
-	/** Titles the user started a download for (the file itself lives on their device). */
-	downloads: number[];
 	resume: Record<string, ResumeEntry>; // key: `${type}:${id}` or `${type}:${id}:${s}:${e}`
 	flags: { serverSwitched: boolean };
 }
@@ -55,7 +53,6 @@ export const emptyPersonal = (): PersonalState => ({
 	liked: [],
 	watchlist: [],
 	watched: [],
-	downloads: [],
 	resume: {},
 	flags: { serverSwitched: false }
 });

@@ -25,7 +25,7 @@ export function checkDomain(input: string): Verdict {
 	if ((OFFICIAL_HOMES as readonly string[]).includes(host))
 		return { kind: 'official', message: `${host} is an official OpenMovies home.` };
 	if ((GATEWAY_HOMES as readonly string[]).includes(host) || host.endsWith('.dawnstudio.app'))
-		return { kind: 'gateway', message: `${host} is a Dawn Studio home — the Dawn Free Port there lists our current address.` };
+		return { kind: 'gateway', message: `${host} is a Dawn Studio home — the gateway hub there lists our current address.` };
 	if (LOOKALIKE_PATTERNS.some((re) => re.test(host)))
 		return {
 			kind: 'lookalike',
@@ -39,5 +39,5 @@ export const FAKE_WARNINGS = [
 	'Any site with pop-ups, redirects or download-this-player prompts is not us — the real OpenMovies has no ads.',
 	'Any app-store app using our name is not us — OpenMovies runs in your browser; add it to your home screen instead.',
 	'We never ask for payment, a card, or your email password. Sign-in is a 6-digit code we email you, nothing else.',
-	'If a domain is not listed on the Dawn Free Port, it is not OpenMovies.'
+	'If a domain is not listed on the Dawn Studio gateway hub, it is not OpenMovies.'
 ] as const;

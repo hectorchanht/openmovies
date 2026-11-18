@@ -22,10 +22,6 @@ export const toggleWatchlist = (s: PersonalState, id: number): PersonalState => 
 export const markWatched = (s: PersonalState, id: number): PersonalState =>
 	s.watched.includes(id) ? s : { ...s, watched: [...s.watched, id] };
 
-/** Record that the user started a download of this title (idempotent). */
-export const recordDownload = (s: PersonalState, id: number): PersonalState =>
-	s.downloads.includes(id) ? s : { ...s, downloads: [...s.downloads, id] };
-
 /** Upsert a resume point. Positions <5s are ignored (accidental opens). */
 export function upsertResume(s: PersonalState, e: ResumeEntry): PersonalState {
 	if (e.positionSec < 5) return s;
@@ -84,7 +80,6 @@ export function parsePersonal(raw: unknown): PersonalState {
 		liked: numList(r.liked),
 		watchlist: numList(r.watchlist),
 		watched: numList(r.watched),
-		downloads: numList(r.downloads),
 		resume,
 		flags: { serverSwitched: flags.serverSwitched === true }
 	};

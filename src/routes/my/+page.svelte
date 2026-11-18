@@ -42,9 +42,6 @@
 <div class="row-head"><h2>Watched</h2></div>
 {#if pick(store.personal.watched).length}<div class="grid">{#each pick(store.personal.watched) as t}<PosterCard title={t} />{/each}</div>{:else}<p class="muted small">Finished titles collect here automatically.</p>{/if}
 
-<div class="row-head"><h2>Downloads</h2></div>
-{#if pick(store.personal.downloads).length}<div class="grid">{#each pick(store.personal.downloads) as t}<PosterCard title={t} />{/each}</div><p class="muted small">Titles you started a download for — the files themselves live on your device. Downloads are always free.</p>{:else}<p class="muted small">Downloads you start will be listed here. Always free — no gate, no tip jar.</p>{/if}
-
 <div class="row-head"><h2>Achievements</h2></div>
 <div class="ach">
 	{#each achievements as a}

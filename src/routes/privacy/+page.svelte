@@ -2,9 +2,6 @@
 <div class="prose">
 	<p><strong>The short version:</strong> OpenMovies is free, with no ads, no pop-ups and no third-party ad trackers. Watching never needs an account.</p>
 
-	<h2>Our data promise</h2>
-	<p><strong>Your data is used only to make this app better. Never sold. We don't track individual users — analytics are anonymous totals only: no user IDs, no IP addresses, no device fingerprints.</strong> This is structural, not just a policy: the analytics store keeps only day / action / title counts, with no field in which an identifier could be stored.</p>
-
 	<h2>What an account stores</h2>
 	<p>A free account exists only for your personal stuff: the titles you have watched, the ones you liked, your resume points (Continue Watching) and your watchlist. That data is tied to your account — not to this domain — so it follows you if OpenMovies ever has to move home. Sign-in is a 6-digit code emailed to you; there are no passwords to leak and no payment details, ever.</p>
 
@@ -14,7 +11,6 @@
 
 	<h2>Third parties</h2>
 	<p>Movie and show metadata comes from TMDB when configured. Playback is embedded from third-party player servers (you can see and switch them on every watch page); those servers may see the request your browser makes to play a video, the same as visiting their site. Subtitle search, when enabled, uses OpenSubtitles. We do not control those services' privacy practices.</p>
-	<p>Some playback servers are ad-funded and carry a 有廣告 · Ads tag on the watch page; if you select one, any ad you see is forced by that server. 我哋唔會從呢啲廣告賺錢 — 廣告係 provider 強制顯示，同我哋無關。We earn nothing from these ads — the provider forces them; they are not ours.</p>
 
 	<h2>On your device</h2>
 	<p>If you never sign in, your lists and resume points live only in your browser's local storage on your own device, under your control.</p>
