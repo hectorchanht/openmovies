@@ -26,9 +26,12 @@ npm run check   # svelte-check
 npm run build   # static SPA -> build/
 ```
 
-Env (build-time, all optional): `PUBLIC_TMDB_API_KEY`,
-`PUBLIC_OPENSUBTITLES_API_KEY`, `PUBLIC_API_BASE`
-(default: the openmovies-api Worker — see `worker/`).
+Env (build-time): `PUBLIC_TMDB_API_KEY`, `PUBLIC_OPENSUBTITLES_API_KEY`
+(optional), and `PUBLIC_API_BASE` — the openmovies-api Worker origin
+(see `worker/`). `PUBLIC_API_BASE` has NO code default: a bundle built
+without it runs API-less (no email sign-in, no Worker resolver cache).
+`scripts/deploy-web.py` always sets it and aborts if the built bundle
+does not contain it — deploy through the script, never by hand.
 
 ## Layout
 
