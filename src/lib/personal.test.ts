@@ -57,3 +57,14 @@ describe('personal layer', () => {
 		expect(s.flags.serverSwitched).toBe(false);
 	});
 });
+
+describe('downloads', () => {
+	it('recordDownload is idempotent and parsePersonal keeps downloads', async () => {
+		const { recordDownload } = await import('./personal');
+		let s = recordDownload(emptyPersonal(), 42);
+		s = recordDownload(s, 42);
+		expect(s.downloads).toEqual([42]);
+		expect(parsePersonal(JSON.parse(JSON.stringify(s))).downloads).toEqual([42]);
+		expect(parsePersonal({ downloads: 'nope' }).downloads).toEqual([]);
+	});
+});
