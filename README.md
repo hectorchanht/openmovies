@@ -34,8 +34,25 @@ Env (build-time, all optional): `PUBLIC_TMDB_API_KEY`,
 
 - `src/lib/tmdb.ts` — TMDB adapter + demo fallback
 - `src/lib/providers.ts` — playback provider registry (swap providers here)
+- `src/lib/resolve.ts` — client resolver memo (session + localStorage, 6h)
 - `src/lib/personal.ts` — watched/liked/resume/watchlist logic (pure, tested)
 - `worker/` — auth codes + per-user sync + anonymous analytics API (D1)
+
+## Resolver caching (Cloudflare Cache API, mirroring OpenMusic)
+
+Playback resolution is cached at two layers so repeat plays are instant:
+
+- **Edge (API Worker, `caches.default`)** — `GET /resolve` payloads 6h;
+  `GET /providers/health` probe rounds 5 min, or only 2 min when a provider
+  failed (negative caching: a dead server is never hammered, and the cached
+  "down" answer powers instant failover in the player); `GET /tmdb/:type/:id`
+  metadata 24h with 2-min negative entries on upstream failure. Cache keys
+  are versioned synthetic own-origin URLs built only from anonymous
+  resolver params — no secrets, no per-user data. Responses carry
+  `x-om-cache: HIT | MISS | NEG`.
+- **Client** — `resolve.ts` memoizes in-session and in localStorage for
+  the same 6h; any API failure falls back to the local provider registry,
+  so watching never depends on the API.
 - `src/routes/gateway` — the Built to Move House survival page
 
 License: Apache-2.0 (same as OpenMusic).
