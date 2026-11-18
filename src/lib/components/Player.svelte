@@ -96,7 +96,11 @@
 			<p class="small muted">{fmt(pos)} / {fmt(duration)}</p>
 		</div>
 	{:else if src}
-		<iframe bind:this={frame} title={`Player — ${title.name}`} src={src} allowfullscreen referrerpolicy="origin" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
+		<!-- No sandbox attribute: embed providers (VidLink first of all) refuse
+		     to run sandboxed and render "Please Disable Sandbox" instead —
+		     Hector's iPad report, 2026-11-18. Parity with BingeBang-class
+		     embeds, which are never sandboxed. -->
+		<iframe bind:this={frame} title={`Player — ${title.name}`} src={src} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
 	{:else}
 		<div class="stage"><p class="muted small">Loading server…</p></div>
 	{/if}
