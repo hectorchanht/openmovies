@@ -20,11 +20,21 @@ import { DEMO_TITLES } from './demo-data';
  * - demo     — our own simulated player. Always works; used for demo rows
  *              and as the honest fallback when nothing else loads.
  */
+export type Capability = 'stream' | 'download';
+
 export interface Provider {
 	id: string;
 	label: string;
+	/** What this provider can do: embed streaming, direct download, or both. */
+	capabilities: Capability[];
 	/** Build the embed URL. season/episode only apply to tv. */
 	build: (t: { id: number; type: 'movie' | 'tv'; season?: number; episode?: number }) => string;
+	/**
+	 * Build a download URL when the provider exposes one (capability
+	 * 'download'). Downloads are always free on OpenMovies — no tip gate
+	 * (that model is OpenMusic-only, by Hector's decision 2026-11-18).
+	 */
+	buildDownload?: (t: { id: number; type: 'movie' | 'tv'; season?: number; episode?: number }) => string;
 	/** True when the provider publishes progress postMessage events. */
 	progressEvents: boolean;
 	verified: boolean;
@@ -34,6 +44,7 @@ export const PROVIDERS: Provider[] = [
 	{
 		id: 'vidlink',
 		label: 'Server 1 · VidLink',
+		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie'
 				? `https://vidlink.pro/movie/${id}?primaryColor=e8590c`
@@ -44,16 +55,24 @@ export const PROVIDERS: Provider[] = [
 	{
 		id: 'vidsrc',
 		label: 'Server 2 · VidSrc',
+		capabilities: ['stream', 'download'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie'
 				? `https://vidsrc.icu/embed/movie/${id}`
 				: `https://vidsrc.icu/embed/tv/${id}/${season}/${episode}`,
+		// Download endpoint dl.vidsrc.vip/{movie|tv}/... — pattern documented
+		// in open-source integrations (e.g. EnjoyTown) and seen across live
+		// download pages 2026-11-18; the host itself is UNVERIFIED live from
+		// this VM, same class as the embed host.
+		buildDownload: ({ id, type, season = 1, episode = 1 }) =>
+			type === 'movie' ? `https://dl.vidsrc.vip/movie/${id}` : `https://dl.vidsrc.vip/tv/${id}/${season}/${episode}`,
 		progressEvents: false,
 		verified: false
 	},
 	{
 		id: 'vidking',
 		label: 'Server 3 · VidKing',
+		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie'
 				? `https://www.vidking.net/embed/movie/${id}?color=e8590c`
@@ -64,11 +83,25 @@ export const PROVIDERS: Provider[] = [
 	{
 		id: 'demo',
 		label: 'Server 4 · Demo Player',
+		capabilities: ['stream'],
 		build: () => 'about:blank',
 		progressEvents: false,
 		verified: true
 	}
 ];
+
+/** Providers that can download this title/episode, with their URLs. */
+export function downloadOptions(t: {
+	id: number;
+	type: 'movie' | 'tv';
+	season?: number;
+	episode?: number;
+}): { provider: Provider; url: string }[] {
+	return PROVIDERS.filter((p) => p.capabilities.includes('download') && p.buildDownload).map((p) => ({
+		provider: p,
+		url: p.buildDownload!(t)
+	}));
+}
 
 export const providerById = (id: string): Provider => PROVIDERS.find((p) => p.id === id) ?? PROVIDERS[0];
 

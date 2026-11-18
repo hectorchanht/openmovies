@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROVIDERS, parseProgressMessage, providerById } from './providers';
+import { PROVIDERS, downloadOptions, parseProgressMessage, providerById } from './providers';
 
 describe('provider registry', () => {
 	it('builds VidLink movie and tv URLs from TMDB ids', () => {
@@ -34,5 +34,26 @@ describe('VidLink progress events', () => {
 		expect(parseProgressMessage({ type: 'OTHER', data: { currentTime: 1, duration: 2 } })).toBeNull();
 		expect(parseProgressMessage({ type: 'PLAYER_EVENT', data: { currentTime: 1, duration: 0 } })).toBeNull();
 		expect(parseProgressMessage({ type: 'PLAYER_EVENT', data: { currentTime: '1', duration: 2 } })).toBeNull();
+	});
+});
+
+describe('download capability', () => {
+	it('every provider declares capabilities; download needs a builder', () => {
+		for (const p of PROVIDERS) {
+			expect(p.capabilities.length).toBeGreaterThan(0);
+			if (p.capabilities.includes('download')) expect(typeof p.buildDownload).toBe('function');
+		}
+	});
+	it('builds dl.vidsrc.vip URLs for movie and episode', () => {
+		const movie = downloadOptions({ id: 27205, type: 'movie' });
+		expect(movie.length).toBeGreaterThan(0);
+		expect(movie[0].url).toBe('https://dl.vidsrc.vip/movie/27205');
+		const ep = downloadOptions({ id: 1396, type: 'tv', season: 2, episode: 3 });
+		expect(ep[0].url).toBe('https://dl.vidsrc.vip/tv/1396/2/3');
+	});
+	it('stream-only providers never appear as download options', () => {
+		const ids = downloadOptions({ id: 1, type: 'movie' }).map((o) => o.provider.id);
+		expect(ids).not.toContain('vidlink');
+		expect(ids).not.toContain('demo');
 	});
 });

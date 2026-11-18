@@ -135,7 +135,7 @@ export async function handleRequest(req: Request, env: Env, now = Date.now()): P
 
 	if (req.method === 'POST' && path === '/analytics/event') {
 		const { action, titleId } = (await req.json().catch(() => ({}))) as { action?: string; titleId?: number };
-		if (!['play', 'detail', 'search'].includes(action ?? '')) return json({ error: 'bad action' }, 400);
+		if (!['play', 'detail', 'search', 'download'].includes(action ?? '')) return json({ error: 'bad action' }, 400);
 		const day = new Date(now).toISOString().slice(0, 10);
 		await env.DB.prepare(
 			'INSERT INTO events (day, action, title_id, count) VALUES (?, ?, ?, 1) ON CONFLICT(day, action, title_id) DO UPDATE SET count = count + 1'

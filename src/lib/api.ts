@@ -60,6 +60,6 @@ export async function pushRemoteState(token: string, state: PersonalState): Prom
 /** Anonymous, aggregate product analytics — what Hector asked for: analysis
  * only, never sold, no third-party trackers. Sends a title id + action +
  * day, nothing personal, and only when the API is configured. */
-export function trackEvent(action: 'play' | 'detail' | 'search', titleId?: number): void {
+export function trackEvent(action: 'play' | 'detail' | 'search' | 'download', titleId?: number): void {
 	void call('/analytics/event', { method: 'POST', body: JSON.stringify({ action, titleId }) });
 }
