@@ -1,0 +1,1 @@
+{"compilerOptions":{"allowJs":true,"checkJs":true,"moduleResolution":"bundler","strict":true},"extends":"./.svelte-kit/tsconfig.json","include":["src/**/*","worker/**/*","vite.config.ts"]}
