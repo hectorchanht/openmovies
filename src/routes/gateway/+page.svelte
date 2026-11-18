@@ -9,7 +9,7 @@
 </script>
 
 <h1>Gateway — Built to Move House</h1>
-<p class="muted">Free streaming sites get taken down and have to move. OpenMovies is built for that from day one: <strong>this app's permanent address book is the Dawn Studio gateway hub at <span class="mono">dawnstudio.app</span></strong>, which lists the current home of every Dawn free app. Bookmark that hub — if this home ever disappears, the new home is announced there and nowhere else. Your account and lists move with the site; you just sign in at the new address.</p>
+<p class="muted">Free streaming sites get taken down and have to move. OpenMovies is built for that from day one: <strong>this app's permanent address book is the Dawn Free Port at <span class="mono">dawnstudio.app/gateway</span></strong>, which lists the current home of every Dawn free app. Bookmark that hub — if this home ever disappears, the new home is announced there and nowhere else. Your account and lists move with the site; you just sign in at the new address.</p>
 
 <div class="panel verdict-official">
 	<span class="pill">Current official home</span>
@@ -36,7 +36,7 @@
 
 <h2>If this home disappears</h2>
 <ol class="steps">
-	<li>Go to the Dawn Studio gateway hub (<span class="mono">dawnstudio.app</span>) — the new home is listed there first.</li>
+	<li>Go to the Dawn Free Port (<span class="mono">dawnstudio.app/gateway</span>) — the new home is listed there first.</li>
 	<li>Verify the new address with the checker above before signing in.</li>
 	<li>Sign in with the same email — watched, liked, resume and watchlist are waiting for you.</li>
 </ol>
@@ -51,7 +51,7 @@
 
 <div class="panel">
 	<h2 style="margin-top:0">No Discord — yet</h2>
-	<p class="small muted">OpenMovies is run solo, and there is no time to moderate a community properly, so there is <strong>no official Discord</strong> — anyone running one under our name is not us. If a volunteer ever steps up as a free mod/admin, a community channel may open, and it will be announced on the gateway hub first. Until then, the gateway hub is the only announcement channel.</p>
+	<p class="small muted">OpenMovies is run solo, and there is no time to moderate a community properly, so there is <strong>no official Discord</strong> — anyone running one under our name is not us. If a volunteer ever steps up as a free mod/admin, a community channel may open, and it will be announced on the Dawn Free Port first. Until then, the Free Port is the only announcement channel.</p>
 </div>
 
 <style>
