@@ -8,17 +8,27 @@ import { DEMO_TITLES } from './demo-data';
  * so each provider is one small adapter behind this interface: to swap one,
  * edit this file only.
  *
- * Verification status (2026-11-18, checked from docs/search):
+ * Verification status (2026-11-18, LIVE-probed from a residential IP in a
+ * real browser after Hector's iPad "We Couldn't Find This Content" report):
  * - vidlink  — URL patterns + PLAYER_EVENT progress postMessages documented
- *              on vidlink.pro itself. VERIFIED patterns.
- * - vidsrc   — vidsrc.icu embed patterns are the long-standing VidSrc scheme
- *              used across open-source forks. Pattern known; the .icu host
- *              itself was NOT live-probed from this VM (datacenter egress is
- *              blocked by several providers) — treat as UNVERIFIED live.
- * - vidking  — embed patterns documented in open-source TMDB integrations
- *              (vidking.net/embed/...). Pattern documented; host UNVERIFIED live.
+ *              on vidlink.pro itself; live-verified (real streams). Its
+ *              catalogue is spotty though — its API returns null for some
+ *              major titles (Interstellar, Dune: Part Two, Coco, Game of
+ *              Thrones S1), which is why the demo catalogue only lists
+ *              titles VidLink was verified to carry (see demo-data.ts).
+ * - vidfast  — vidfast.pro/movie/{id} and /tv/{id}/{s}/{e}; live-verified
+ *              the same day (player + <video> element, including for
+ *              titles VidLink lacks). Progress-event support is NOT
+ *              verified, so progressEvents stays false.
  * - demo     — our own simulated player. Always works; used for demo rows
  *              and as the honest fallback when nothing else loads.
+ *
+ * REMOVED 2026-11-18 (dead hosts, verified by DNS from two networks):
+ * vidsrc (vidsrc.icu AND dl.vidsrc.vip both NXDOMAIN) and vidking
+ * (vidking.net unresolvable). VidSrc was the only download source, so no
+ * provider currently offers downloads: downloadOptions() returns [] and
+ * the UI hides its download buttons instead of linking to dead hosts.
+ * The capability machinery stays for the next provider that offers it.
  */
 export type Capability = 'stream' | 'download';
 
@@ -53,36 +63,17 @@ export const PROVIDERS: Provider[] = [
 		verified: true
 	},
 	{
-		id: 'vidsrc',
-		label: 'Server 2 · VidSrc',
-		capabilities: ['stream', 'download'],
-		build: ({ id, type, season = 1, episode = 1 }) =>
-			type === 'movie'
-				? `https://vidsrc.icu/embed/movie/${id}`
-				: `https://vidsrc.icu/embed/tv/${id}/${season}/${episode}`,
-		// Download endpoint dl.vidsrc.vip/{movie|tv}/... — pattern documented
-		// in open-source integrations (e.g. EnjoyTown) and seen across live
-		// download pages 2026-11-18; the host itself is UNVERIFIED live from
-		// this VM, same class as the embed host.
-		buildDownload: ({ id, type, season = 1, episode = 1 }) =>
-			type === 'movie' ? `https://dl.vidsrc.vip/movie/${id}` : `https://dl.vidsrc.vip/tv/${id}/${season}/${episode}`,
-		progressEvents: false,
-		verified: false
-	},
-	{
-		id: 'vidking',
-		label: 'Server 3 · VidKing',
+		id: 'vidfast',
+		label: 'Server 2 · VidFast',
 		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
-			type === 'movie'
-				? `https://www.vidking.net/embed/movie/${id}?color=e8590c`
-				: `https://www.vidking.net/embed/tv/${id}/${season}/${episode}?color=e8590c&episodeSelector=true`,
+			type === 'movie' ? `https://vidfast.pro/movie/${id}` : `https://vidfast.pro/tv/${id}/${season}/${episode}`,
 		progressEvents: false,
-		verified: false
+		verified: true
 	},
 	{
 		id: 'demo',
-		label: 'Server 4 · Demo Player',
+		label: 'Server 3 · Demo Player',
 		capabilities: ['stream'],
 		build: () => 'about:blank',
 		progressEvents: false,
@@ -104,6 +95,21 @@ export function downloadOptions(t: {
 }
 
 export const providerById = (id: string): Provider => PROVIDERS.find((p) => p.id === id) ?? PROVIDERS[0];
+
+/**
+ * Chip suffix for a server button, given the provider ids the Worker's
+ * edge health probe could NOT confirm. The only negative marker is
+ * "· unverified": either we have never verified the provider ourselves,
+ * or the edge probe (which runs from Cloudflare's network — a vantage
+ * point providers routinely block, and which says nothing about a real
+ * user's device) failed to confirm the host. Probe data must NEVER be
+ * rendered as "down", and the player must never skip a server because of
+ * it: servers are tried in listed order, and the user switches manually.
+ */
+export function providerMarker(p: { id: string; verified: boolean }, unconfirmedIds: readonly string[]): string {
+	if (p.id === 'demo') return '';
+	return !p.verified || unconfirmedIds.includes(p.id) ? ' · unverified' : '';
+}
 
 /**
  * Parse a VidLink PLAYER_EVENT postMessage payload into a progress sample.

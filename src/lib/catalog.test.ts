@@ -41,6 +41,15 @@ describe('TMDB adapter', () => {
 		const t = mapTmdb({ id: 9, name: 'Show', first_air_date: '2021-01-01', vote_average: 8, genres: [{ name: 'Drama' }] }, 'tv');
 		expect(t).toMatchObject({ name: 'Show', year: 2021, genres: ['Drama'] });
 	});
+	it('demo catalogue lists only titles VidLink was verified to carry (carriage audit 2026-11-18)', () => {
+		// VidLink's API returned null ("We Couldn't Find This Content") for
+		// these major titles on 2026-11-18 — they must not come back into
+		// the demo catalogue without a fresh live re-audit (see demo-data.ts).
+		const banned = [157336, 693134, 354912, 1399]; // Interstellar, Dune: Part Two, Coco, Game of Thrones
+		for (const id of banned) expect(DEMO_TITLES.map((t) => t.id)).not.toContain(id);
+		expect(DEMO_TITLES.length).toBe(14);
+		expect(new Set(DEMO_TITLES.map((t) => t.id)).size).toBe(DEMO_TITLES.length);
+	});
 	it('filterTitles applies type/genre/query together (browse flow)', () => {
 		const r = filterTitles(DEMO_TITLES, { type: 'tv', genre: 'Drama' });
 		expect(r.length).toBeGreaterThan(0);

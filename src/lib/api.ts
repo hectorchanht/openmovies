@@ -62,6 +62,10 @@ export async function pushRemoteState(token: string, state: PersonalState): Prom
 
 export interface ProviderHealthInfo {
 	id: string;
+	/** `ok` = the Worker's edge probe got a definitive HTTP answer from
+	 * the host. `ok: false` = the probe was inconclusive (it runs from
+	 * Cloudflare's network, a vantage users never have) — it must only
+	 * ever surface as "unverified", never "down". See providerMarker. */
 	ok: boolean;
 	status: number | null;
 	latencyMs: number;
@@ -69,7 +73,7 @@ export interface ProviderHealthInfo {
 
 /** Provider health from the Worker (itself edge-cached, failures negative-
  * cached). Best-effort: null when the API is unconfigured or unreachable,
- * in which case the player simply shows no down-markers. */
+ * in which case the player simply shows no markers. */
 export async function fetchProviderHealth(): Promise<ProviderHealthInfo[] | null> {
 	const res = await call('/providers/health');
 	if (!res || !res.ok) return null;

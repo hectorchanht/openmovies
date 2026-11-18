@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { PROVIDERS, parseProgressMessage } from '$lib/providers';
+	import { PROVIDERS, parseProgressMessage, providerMarker } from '$lib/providers';
 	import { BUILTIN_TRACKS, searchSubtitles, type SubtitleTrack } from '$lib/subtitles';
 	import { resolveSource } from '$lib/resolve';
 	import { fetchProviderHealth } from '$lib/api';
@@ -31,10 +31,13 @@
 			if (`${providerId}:${title.id}:${title.type}:${season}:${episode}` === stamp) src = r.embedUrl;
 		});
 	});
-	// Providers the Worker's health probe currently reports down (its
-	// negative-cached answer makes this cheap); used for chip markers and
-	// a one-time failover of the initial pick.
-	let downIds = $state<string[]>([]);
+	// Providers the Worker's EDGE health probe could not confirm. The
+	// probe runs from Cloudflare's network, which providers often block
+	// while real devices connect fine — so an unconfirmed probe only
+	// earns a chip "· unverified" marker (see providerMarker). It is
+	// never shown as "down" and never causes a server to be skipped:
+	// servers are tried in listed order.
+	let unconfirmedIds = $state<string[]>([]);
 	const key = $derived(resumeKey({ type: title.type, id: title.id, season: title.type === 'tv' ? season : undefined, episode: title.type === 'tv' ? episode : undefined }));
 
 	let lastSave = 0;
@@ -55,13 +58,10 @@
 		if (existing) pos = existing.positionSec;
 		void fetchProviderHealth().then((health) => {
 			if (!health) return;
-			downIds = health.filter((p) => !p.ok).map((p) => p.id);
-			// Instant failover: if the initial server is reported down, jump
-			// straight to the first healthy one instead of a dead iframe.
-			if (downIds.includes(providerId)) {
-				const alive = PROVIDERS.find((p) => p.id !== 'demo' && !downIds.includes(p.id));
-				if (alive) providerId = alive.id;
-			}
+			// Deliberately NO failover here: an edge-probe failure is not
+			// evidence about this device's reachability, so the initial
+			// server stays the listed Server 1 (see providerMarker).
+			unconfirmedIds = health.filter((p) => !p.ok).map((p) => p.id);
 		});
 		void searchSubtitles({ tmdbId: title.id, type: title.type, season, episode }).then((t) => (tracks = t));
 		const onMsg = (ev: MessageEvent) => {
@@ -109,7 +109,7 @@
 <div class="controls">
 	<div class="servers" role="group" aria-label="Playback server">
 		{#each PROVIDERS as p}
-			<button class="chip" class:on={providerId === p.id} onclick={() => switchTo(p.id)}>{p.label}{#if downIds.includes(p.id)} · down{/if}{#if !p.verified && p.id !== 'demo'} · unverified{/if}</button>
+			<button class="chip" class:on={providerId === p.id} onclick={() => switchTo(p.id)}>{p.label}{providerMarker(p, unconfirmedIds)}</button>
 		{/each}
 	</div>
 	<label class="subs small muted">Subtitles

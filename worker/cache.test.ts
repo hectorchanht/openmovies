@@ -54,9 +54,10 @@ describe('cache keys', () => {
 		expect(resolvePayloadFor({ provider: 'vidlink', type: 'movie', id: 27205, season: 1, episode: 1 })?.embedUrl).toBe(
 			'https://vidlink.pro/movie/27205?primaryColor=e8590c'
 		);
-		expect(resolvePayloadFor({ provider: 'vidsrc', type: 'tv', id: 1396, season: 2, episode: 3 })?.downloadUrl).toBe(
-			'https://dl.vidsrc.vip/tv/1396/2/3'
+		expect(resolvePayloadFor({ provider: 'vidfast', type: 'tv', id: 1396, season: 2, episode: 3 })?.embedUrl).toBe(
+			'https://vidfast.pro/tv/1396/2/3'
 		);
+		expect(resolvePayloadFor({ provider: 'vidfast', type: 'tv', id: 1396, season: 2, episode: 3 })?.downloadUrl).toBeNull();
 		expect(resolvePayloadFor({ provider: 'nope', type: 'movie', id: 1, season: 1, episode: 1 })).toBeNull();
 	});
 });
@@ -65,16 +66,16 @@ describe('GET /resolve — edge cached', () => {
 	it('MISS then HIT, stored with the 6h resolver TTL', async () => {
 		const cache = new MockCache();
 		const { env: e, deps } = env(cache);
-		const r1 = await handleRequest(get('/resolve?provider=vidsrc&type=movie&id=27205'), e, NOW, deps);
+		const r1 = await handleRequest(get('/resolve?provider=vidfast&type=movie&id=27205'), e, NOW, deps);
 		expect(r1.status).toBe(200);
 		expect(r1.headers.get('x-om-cache')).toBe('MISS');
-		const body1 = (await r1.json()) as { embedUrl: string; downloadUrl: string };
-		expect(body1.embedUrl).toBe('https://vidsrc.icu/embed/movie/27205');
-		expect(body1.downloadUrl).toBe('https://dl.vidsrc.vip/movie/27205');
+		const body1 = (await r1.json()) as { embedUrl: string; downloadUrl: string | null };
+		expect(body1.embedUrl).toBe('https://vidfast.pro/movie/27205');
+		expect(body1.downloadUrl).toBeNull();
 		const stored = [...cache.store.values()][0];
 		expect(stored.cacheControl).toBe(`public, max-age=${RESOLVE_TTL_S}`);
 
-		const r2 = await handleRequest(get('/resolve?provider=vidsrc&type=movie&id=27205'), e, NOW, deps);
+		const r2 = await handleRequest(get('/resolve?provider=vidfast&type=movie&id=27205'), e, NOW, deps);
 		expect(r2.headers.get('x-om-cache')).toBe('HIT');
 		expect(((await r2.json()) as { embedUrl: string }).embedUrl).toBe(body1.embedUrl);
 	});
@@ -100,7 +101,7 @@ describe('GET /providers/health — negative caching', () => {
 	it('a failed probe is cached briefly (NEGATIVE_TTL) and not re-probed inside the window', async () => {
 		const cache = new MockCache();
 		const fetchMock = vi.fn(async (u: string) => {
-			if (u.includes('vidsrc')) throw new Error('host down');
+			if (u.includes('vidfast')) throw new Error('probe blocked');
 			return new Response('', { status: 200 });
 		});
 		const fetchFn = fetchMock as unknown as typeof fetch;
@@ -111,11 +112,14 @@ describe('GET /providers/health — negative caching', () => {
 		expect(r1.headers.get('x-om-cache')).toBe('MISS');
 		const h1 = (await r1.json()) as { ttl: number; providers: { id: string; ok: boolean }[] };
 		expect(h1.ttl).toBe(NEGATIVE_TTL_S);
-		expect(h1.providers.find((p) => p.id === 'vidsrc')?.ok).toBe(false);
+		// A failed probe means "unconfirmed from the edge", never "down" —
+		// the ok:false here is all the client gets, and it renders it as
+		// "unverified" only (see providerMarker in src/lib/providers.ts).
+		expect(h1.providers.find((p) => p.id === 'vidfast')?.ok).toBe(false);
 		expect(h1.providers.find((p) => p.id === 'vidlink')?.ok).toBe(true);
 		expect(h1.providers.find((p) => p.id === 'demo')?.ok).toBe(true);
 		const probes = fetchMock.mock.calls.length;
-		expect(probes).toBe(3); // 3 hosted providers; demo is never probed
+		expect(probes).toBe(2); // 2 hosted providers; demo is never probed
 
 		const r2 = await handleRequest(get('/providers/health'), e, NOW, deps);
 		expect(r2.headers.get('x-om-cache')).toBe('HIT');

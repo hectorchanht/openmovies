@@ -7,6 +7,16 @@ import type { Title } from './types';
  * one-line summary (no TMDB text is bundled). Poster art is generated CSS
  * gradients (see `art`), never hotlinked artwork. When PUBLIC_TMDB_API_KEY
  * is set, the TMDB adapter replaces this dataset entirely with live data.
+ *
+ * CARRIAGE AUDIT 2026-11-18 (Hector's iPad "We Couldn't Find This Content"
+ * report): every id below was re-verified against TMDB, AND every row was
+ * live-probed on Server 1 (VidLink) from a residential IP in a real
+ * browser — all rows returned a real stream (S1E1 for TV). VidLink's
+ * catalogue is spotty: Interstellar (157336), Dune: Part Two (693134),
+ * Coco (354912) and Game of Thrones (1399) are NOT carried by VidLink
+ * (its API returns null), so they were swapped for verified-carried
+ * equivalents (Tenet, Top Gun: Maverick, Spider-Man: Across the
+ * Spider-Verse, House of the Dragon). Re-audit before swapping rows back.
  */
 export const DEMO_TITLES: Title[] = [
 	{
@@ -16,10 +26,10 @@ export const DEMO_TITLES: Title[] = [
 		art: 'linear-gradient(135deg,#1d2b64,#f8cd30)'
 	},
 	{
-		id: 157336, type: 'movie', name: 'Interstellar', year: 2014,
-		genres: ['Sci-Fi', 'Drama'], rating: 8.5, runtimeMin: 169,
-		overview: 'Explorers cross a wormhole looking for a new home as Earth slowly becomes unlivable.',
-		art: 'linear-gradient(135deg,#0f2027,#2c5364)'
+		id: 577922, type: 'movie', name: 'Tenet', year: 2020,
+		genres: ['Sci-Fi', 'Action'], rating: 7.2, runtimeMin: 150,
+		overview: 'An operative learns to move through inverted time to stop a war between the present and the future.',
+		art: 'linear-gradient(135deg,#141e30,#243b55)'
 	},
 	{
 		id: 155, type: 'movie', name: 'The Dark Knight', year: 2008,
@@ -28,10 +38,10 @@ export const DEMO_TITLES: Title[] = [
 		art: 'linear-gradient(135deg,#232526,#414345)'
 	},
 	{
-		id: 693134, type: 'movie', name: 'Dune: Part Two', year: 2024,
-		genres: ['Sci-Fi', 'Adventure'], rating: 8.2, runtimeMin: 166,
-		overview: 'Paul Atreides joins the Fremen and walks the road toward revenge and destiny on Arrakis.',
-		art: 'linear-gradient(135deg,#c7903a,#5c3317)'
+		id: 361743, type: 'movie', name: 'Top Gun: Maverick', year: 2022,
+		genres: ['Action', 'Drama'], rating: 8.2, runtimeMin: 130,
+		overview: 'Thirty years on, Maverick trains a new squad of pilots for a mission no pilot has ever come back from.',
+		art: 'linear-gradient(135deg,#1e3c72,#2a5298)'
 	},
 	{
 		id: 872585, type: 'movie', name: 'Oppenheimer', year: 2023,
@@ -52,10 +62,10 @@ export const DEMO_TITLES: Title[] = [
 		art: 'linear-gradient(135deg,#41295a,#2f0743)'
 	},
 	{
-		id: 354912, type: 'movie', name: 'Coco', year: 2017,
-		genres: ['Animation', 'Family'], rating: 8.2, runtimeMin: 105,
-		overview: 'A young musician journeys to the Land of the Dead to unlock his family history.',
-		art: 'linear-gradient(135deg,#f953c6,#b91d73)'
+		id: 569094, type: 'movie', name: 'Spider-Man: Across the Spider-Verse', year: 2023,
+		genres: ['Animation', 'Action'], rating: 8.3, runtimeMin: 140,
+		overview: 'Miles Morales catapults across the multiverse and clashes with a society of Spider-People over how to save his family.',
+		art: 'linear-gradient(135deg,#8e2de2,#ff6a00)'
 	},
 	{
 		id: 1396, type: 'tv', name: 'Breaking Bad', year: 2008,
@@ -69,14 +79,14 @@ export const DEMO_TITLES: Title[] = [
 		]
 	},
 	{
-		id: 1399, type: 'tv', name: 'Game of Thrones', year: 2011,
-		genres: ['Drama', 'Fantasy'], rating: 8.4, seasons: 8,
-		overview: 'Noble families wage war for the Iron Throne as an ancient enemy returns.',
-		art: 'linear-gradient(135deg,#16222a,#3a6073)',
+		id: 94997, type: 'tv', name: 'House of the Dragon', year: 2022,
+		genres: ['Drama', 'Fantasy'], rating: 8.4, seasons: 3,
+		overview: 'The Targaryens at the height of their power begin a slow, fiery fall over who inherits the Iron Throne.',
+		art: 'linear-gradient(135deg,#3a0d0d,#b31217)',
 		episodes: [
-			{ season: 1, episode: 1, title: 'Winter Is Coming', runtimeMin: 62 },
-			{ season: 1, episode: 2, title: 'The Kingsroad', runtimeMin: 56 },
-			{ season: 1, episode: 3, title: 'Lord Snow', runtimeMin: 58 }
+			{ season: 1, episode: 1, title: 'The Heirs of the Dragon', runtimeMin: 66 },
+			{ season: 1, episode: 2, title: 'The Rogue Prince', runtimeMin: 54 },
+			{ season: 1, episode: 3, title: 'Second of His Name', runtimeMin: 63 }
 		]
 	},
 	{

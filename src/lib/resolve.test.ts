@@ -36,7 +36,7 @@ describe('memo layer', () => {
 		expect(memoKey('vidlink', { id: 1, type: 'tv', season: 1, episode: 2 })).not.toBe(
 			memoKey('vidlink', { id: 1, type: 'tv', season: 1, episode: 3 })
 		);
-		expect(memoKey('vidsrc', { id: 1, type: 'movie' })).not.toBe(memoKey('vidlink', { id: 1, type: 'movie' }));
+		expect(memoKey('vidfast', { id: 1, type: 'movie' })).not.toBe(memoKey('vidlink', { id: 1, type: 'movie' }));
 	});
 
 	it('persists to storage and expires on the TTL', () => {
@@ -67,18 +67,18 @@ describe('resolveSource', () => {
 			throw new Error('api down');
 		}) as unknown as typeof fetch;
 		const r = await resolveSource(
-			'vidsrc',
+			'vidfast',
 			{ id: 1396, type: 'tv', season: 2, episode: 3 },
 			{ apiBase: 'https://api.test', fetchFn, now: NOW, storage: new FakeStorage() }
 		);
-		expect(r.embedUrl).toBe('https://vidsrc.icu/embed/tv/1396/2/3');
-		expect(r.downloadUrl).toBe('https://dl.vidsrc.vip/tv/1396/2/3');
+		expect(r.embedUrl).toBe('https://vidfast.pro/tv/1396/2/3');
+		expect(r.downloadUrl).toBeNull();
 	});
 
 	it('with no API configured, resolves locally with zero fetches', async () => {
 		const fetchFn = vi.fn() as unknown as typeof fetch;
-		const r = await resolveSource('vidking', { id: 603, type: 'movie' }, { apiBase: '', fetchFn, now: NOW, storage: new FakeStorage() });
-		expect(r.embedUrl).toContain('vidking.net/embed/movie/603');
+		const r = await resolveSource('vidfast', { id: 603, type: 'movie' }, { apiBase: '', fetchFn, now: NOW, storage: new FakeStorage() });
+		expect(r.embedUrl).toContain('vidfast.pro/movie/603');
 		expect(fetchFn).not.toHaveBeenCalled();
 	});
 });

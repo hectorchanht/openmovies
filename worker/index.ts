@@ -206,32 +206,18 @@ export const SERVER_PROVIDERS: ServerProvider[] = [
 				: `https://vidlink.pro/tv/${id}/${season}/${episode}?primaryColor=e8590c`
 	},
 	{
-		id: 'vidsrc',
-		label: 'Server 2 · VidSrc',
-		capabilities: ['stream', 'download'],
-		progressEvents: false,
-		verified: false,
-		host: 'vidsrc.icu',
-		build: ({ id, type, season, episode }) =>
-			type === 'movie' ? `https://vidsrc.icu/embed/movie/${id}` : `https://vidsrc.icu/embed/tv/${id}/${season}/${episode}`,
-		buildDownload: ({ id, type, season, episode }) =>
-			type === 'movie' ? `https://dl.vidsrc.vip/movie/${id}` : `https://dl.vidsrc.vip/tv/${id}/${season}/${episode}`
-	},
-	{
-		id: 'vidking',
-		label: 'Server 3 · VidKing',
+		id: 'vidfast',
+		label: 'Server 2 · VidFast',
 		capabilities: ['stream'],
 		progressEvents: false,
-		verified: false,
-		host: 'www.vidking.net',
+		verified: true,
+		host: 'vidfast.pro',
 		build: ({ id, type, season, episode }) =>
-			type === 'movie'
-				? `https://www.vidking.net/embed/movie/${id}?color=e8590c`
-				: `https://www.vidking.net/embed/tv/${id}/${season}/${episode}?color=e8590c&episodeSelector=true`
+			type === 'movie' ? `https://vidfast.pro/movie/${id}` : `https://vidfast.pro/tv/${id}/${season}/${episode}`
 	},
 	{
 		id: 'demo',
-		label: 'Server 4 · Demo Player',
+		label: 'Server 3 · Demo Player',
 		capabilities: ['stream'],
 		progressEvents: false,
 		verified: true,
@@ -267,6 +253,17 @@ export function resolvePayloadFor(p: ResolveParams): ResolvePayload | null {
 
 export interface ProviderHealth {
 	id: string;
+	/**
+	 * `ok` means ONLY that this edge probe got a definitive HTTP answer
+	 * from the host (status < 500). `ok: false` means the probe was
+	 * INCONCLUSIVE — DNS/connection failure, timeout, or a 5xx produced
+	 * by an intermediary (e.g. Cloudflare's 530 in front of an origin it
+	 * cannot reach). It is NOT evidence the host is down for end users:
+	 * the probe runs from Cloudflare's network, which providers often
+	 * block while real devices connect fine. Clients must surface a
+	 * failed probe as "unverified", never "down", and must not skip or
+	 * fail over away from a server because of it.
+	 */
 	ok: boolean;
 	status: number | null;
 	latencyMs: number;
@@ -280,9 +277,11 @@ export interface HealthPayload {
 }
 
 /**
- * Probe every provider host once. A failure is data, not an exception —
- * the caller negative-caches it briefly so a dead host is not hammered
- * and the player can fail over instantly from the cached answer.
+ * Probe every provider host once, from the edge. A failure is data, not
+ * an exception — the caller negative-caches it briefly so a host that
+ * refuses edge probes is not hammered. The result only ever CONFIRMS a
+ * host answered; it can never prove a host is down for users (see the
+ * `ok` contract on ProviderHealth).
  */
 export async function probeProviders(
 	fetchFn: typeof fetch,
