@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { PROVIDERS, parseProgressMessage, providerById } from '$lib/providers';
+	import { PROVIDERS, parseProgressMessage } from '$lib/providers';
 	import { BUILTIN_TRACKS, searchSubtitles, type SubtitleTrack } from '$lib/subtitles';
+	import { resolveSource } from '$lib/resolve';
+	import { fetchProviderHealth } from '$lib/api';
 	import { store } from '$lib/store.svelte';
 	import { resumeKey } from '$lib/types';
 	import type { Title } from '$lib/types';
@@ -17,8 +19,22 @@
 	const duration = $derived((title.type === 'movie' ? (title.runtimeMin ?? 100) : 50) * 60);
 	let frame: HTMLIFrameElement | undefined = $state();
 
-	const provider = $derived(providerById(providerId));
-	const src = $derived(provider.build({ id: title.id, type: title.type, season, episode }));
+	// Embed URL comes from the resolver layer (memoized in-session +
+	// localStorage, backed by the Worker's Cloudflare edge cache) — server
+	// switches and Continue Watching never re-resolve a known source.
+	let src = $state('');
+	$effect(() => {
+		const pid = providerId;
+		const target = { id: title.id, type: title.type, season, episode };
+		const stamp = `${pid}:${target.id}:${target.type}:${season}:${episode}`;
+		void resolveSource(pid, target).then((r) => {
+			if (`${providerId}:${title.id}:${title.type}:${season}:${episode}` === stamp) src = r.embedUrl;
+		});
+	});
+	// Providers the Worker's health probe currently reports down (its
+	// negative-cached answer makes this cheap); used for chip markers and
+	// a one-time failover of the initial pick.
+	let downIds = $state<string[]>([]);
 	const key = $derived(resumeKey({ type: title.type, id: title.id, season: title.type === 'tv' ? season : undefined, episode: title.type === 'tv' ? episode : undefined }));
 
 	let lastSave = 0;
@@ -37,6 +53,16 @@
 	onMount(() => {
 		const existing = store.personal.resume[key];
 		if (existing) pos = existing.positionSec;
+		void fetchProviderHealth().then((health) => {
+			if (!health) return;
+			downIds = health.filter((p) => !p.ok).map((p) => p.id);
+			// Instant failover: if the initial server is reported down, jump
+			// straight to the first healthy one instead of a dead iframe.
+			if (downIds.includes(providerId)) {
+				const alive = PROVIDERS.find((p) => p.id !== 'demo' && !downIds.includes(p.id));
+				if (alive) providerId = alive.id;
+			}
+		});
 		void searchSubtitles({ tmdbId: title.id, type: title.type, season, episode }).then((t) => (tracks = t));
 		const onMsg = (ev: MessageEvent) => {
 			if (!frame?.src) return;
@@ -69,15 +95,17 @@
 			<input class="seek" type="range" min="0" max={duration} value={pos} oninput={(e) => { pos = Number((e.currentTarget as HTMLInputElement).value); save(pos, duration); }} aria-label="Seek" />
 			<p class="small muted">{fmt(pos)} / {fmt(duration)}</p>
 		</div>
-	{:else}
+	{:else if src}
 		<iframe bind:this={frame} title={`Player — ${title.name}`} src={src} allowfullscreen referrerpolicy="origin" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
+	{:else}
+		<div class="stage"><p class="muted small">Loading server…</p></div>
 	{/if}
 </div>
 
 <div class="controls">
 	<div class="servers" role="group" aria-label="Playback server">
 		{#each PROVIDERS as p}
-			<button class="chip" class:on={providerId === p.id} onclick={() => switchTo(p.id)}>{p.label}{#if !p.verified && p.id !== 'demo'} · unverified{/if}</button>
+			<button class="chip" class:on={providerId === p.id} onclick={() => switchTo(p.id)}>{p.label}{#if downIds.includes(p.id)} · down{/if}{#if !p.verified && p.id !== 'demo'} · unverified{/if}</button>
 		{/each}
 	</div>
 	<label class="subs small muted">Subtitles

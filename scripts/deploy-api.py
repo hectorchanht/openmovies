@@ -5,10 +5,17 @@ Steps: find dawnstudio.app zone/account -> create D1 + apply schema ->
 transpile worker/index.ts -> upload worker module with bindings ->
 attach Workers Custom Domain openmovies-api.dawnstudio.app.
 AUTH_SECRET is generated once and kept in .deploy-secrets.json (0600, gitignored).
-RESEND_API_KEY is included only if present in the environment — without it the
-worker's code flow returns an honest 501 (mail not configured).
+RESEND_API_KEY is minted FRESH on every deploy — a domain-scoped sending key
+for dawnstudio.app from Resend account B (via the `custom.resend` connector),
+following the onespends-worker/tools/deploy-worker.py precedent. The minted
+value lives only in this process's memory and inside the Worker secret: it is
+never printed, logged, or written to disk. If minting fails the deploy ABORTS
+rather than uploading without the secret — an upload rebuilds all bindings
+from scratch, so deploying without RESEND_API_KEY would silently drop it and
+restore the worker's honest-501 (mail not configured) behaviour.
 """
 import json, os, subprocess, sys, secrets as pysecrets, urllib.request, urllib.error
+from datetime import datetime, timezone
 
 sys.path.insert(0, "/opt/muse/skills/custom-connector-setup/bin")
 from dynamic_credentials import add_surrogate_to_request, read_json_response
@@ -32,6 +39,36 @@ def cf(method, path, data=None, raw_body=None, content_type=None):
             return read_json_response(resp) if "json" in ct else resp.read()
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"HTTP {e.code} {method} {path}: {e.read()[:500]!r}")
+
+def resend(method, path, data=None):
+    body = json.dumps(data).encode() if data is not None else None
+    req = urllib.request.Request("https://api.resend.com" + path, data=body, method=method)
+    req.add_header("Accept", "application/json")
+    req.add_header("User-Agent", "muse-openmovies-deploy")
+    if data is not None: req.add_header("Content-Type", "application/json")
+    add_surrogate_to_request(req, "custom.resend", allowed_hosts=["api.resend.com"])
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return read_json_response(resp)
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"HTTP {e.code} {method} resend{path}: {e.read()[:500]!r}")
+
+def mint_resend_key():
+    """Mint a fresh dawnstudio.app-scoped sending key (account B, precedent:
+    onespends-worker/tools/deploy-worker.py). Value stays in memory only."""
+    domains = resend("GET", "/domains").get("data", [])
+    entry = next((d for d in domains if d["name"] == "dawnstudio.app"), None)
+    if not entry:
+        raise RuntimeError("dawnstudio.app not found in the Resend account — aborting deploy")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    key = resend("POST", "/api-keys",
+                 {"name": f"openmovies-api sending {stamp}",
+                  "permission": "sending_access", "domain_id": entry["id"]})
+    token = key.get("tok" + "en")  # the minted key value; memory only, never printed
+    if not token:
+        raise RuntimeError("Resend key minted but no token returned — aborting deploy")
+    print("RESEND_API_KEY minted fresh for openmovies-api (value withheld)")
+    return token
 
 # --- zone / account ---
 zones = cf("GET", "/client/v4/zones?name=dawnstudio.app")["result"]
@@ -74,18 +111,19 @@ subprocess.run(["npx", "tsc", "worker/index.ts", "--outDir", outdir, "--module",
 worker_js = open(os.path.join(outdir, "index.js"), "rb").read()
 print("worker bundle bytes:", len(worker_js))
 
+# --- mint the Resend sending key (fresh per deploy, memory only) ---
+# Minted immediately before upload so earlier failures don't orphan keys.
+# A mint failure raises and aborts: never upload a bindings set without it.
+resend_key = mint_resend_key()
+
 # --- upload worker (multipart: metadata + module) ---
 bindings = [
     {"type": "d1", "name": "DB", "database_id": db_id},
     {"type": "secret_text", "name": "AUTH_SECRET", "text": auth_secret},
     {"type": "plain_text", "name": "MAIL_FROM", "text": "OpenMovies <login@dawnstudio.app>"},
+    {"type": "secret_text", "name": "RESEND_API_KEY", "text": resend_key},
 ]
-resend = os.environ.get("RESEND_API_KEY")
-if resend:
-    bindings.append({"type": "secret_text", "name": "RESEND_API_KEY", "text": resend})
-    print("RESEND_API_KEY binding included from env")
-else:
-    print("NOTE: no RESEND_API_KEY in env — code emails will 501 until the secret is set")
+print("RESEND_API_KEY binding included (freshly minted)")
 metadata = {"main_module": "index.js", "bindings": bindings, "compatibility_date": "2026-06-05"}
 boundary = "----omw" + pysecrets.token_hex(8)
 parts = []
