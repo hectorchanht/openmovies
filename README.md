@@ -59,3 +59,9 @@ Playback resolution is cached at two layers so repeat plays are instant:
 - `src/routes/gateway` — the Built to Move House survival page
 
 License: Apache-2.0 (same as OpenMusic).
+
+## Licence
+
+This software is licensed under the PolyForm Noncommercial License 1.0.0 - see [LICENSE](LICENSE).
+
+Commercial or business use of this software requires the prior written acknowledgement of Dawn Studio.
