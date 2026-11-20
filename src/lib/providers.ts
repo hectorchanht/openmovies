@@ -32,14 +32,20 @@ import { DEMO_TITLES } from './demo-data';
  * ads-when-unsandboxed labels, and the Demo Player is the default. Their
  * adapters stay here (never deleted) for a future sandbox-clean retest.
  *
- * AD MODE UPDATE (2026-11-20, Hector refined ruling, same day): availability
- * outranks ad-purity — sometimes only the ad-supported providers can
- * actually play, and the worst outcome is a user left with nothing to
- * watch. So an explicit, user-opened Ad Mode (Player.svelte, default OFF,
- * persisted per device) renders an `adSupported` provider's iframe
- * WITHOUT the sandbox — inside that mode only, and for ad-supported
- * providers only. The default stays ad-free and sandboxed; clean
- * providers are sandboxed in every mode.
+ * AD MODE UPDATE (2026-11-20, Hector refined ruling, same day, lightest
+ * form): availability outranks ad-purity — sometimes only the
+ * ad-supported providers can actually play, and the worst outcome is a
+ * user left with nothing to watch. The disclosure is a simple
+ * 有廣告 · Ads TAG on the provider's chip: a user who taps a tagged
+ * provider has knowingly opted in — that tap IS the consent — so a
+ * selected adSupported provider renders WITHOUT the sandbox directly,
+ * with no extra notices, dialogs or enable steps (Player.svelte). Ad
+ * Mode state follows that selection and stays sticky per device; the
+ * visible toggle can switch it back off, which re-sandboxes everything
+ * immediately. The default selection stays a clean provider, and
+ * untagged providers are sandboxed in every state. OpenMovies earns
+ * NOTHING from these ads — the provider forces them; they are not ours,
+ * and the UI says so in one small line near the player.
  *
  * REMOVED 2026-11-18 (dead hosts, verified by DNS from two networks):
  * vidsrc (vidsrc.icu AND dl.vidsrc.vip both NXDOMAIN) and vidking
@@ -67,11 +73,11 @@ export interface Provider {
 	progressEvents: boolean;
 	/**
 	 * True when the provider is funded by ads/popunders and therefore
-	 * refuses to play while sandboxed. An adSupported provider renders
-	 * UNSANDBOXED only when the user has explicitly turned Ad Mode on
-	 * (Player.svelte); in every other state it stays sandboxed like
-	 * every other provider. Clean providers are always false here and
-	 * are sandboxed in every mode.
+	 * refuses to play while sandboxed. Its chip carries the 有廣告 · Ads
+	 * tag, and selecting it is the user's opt-in: a selected adSupported
+	 * provider renders UNSANDBOXED (Player.svelte) unless the user has
+	 * switched Ad Mode back off. Clean providers are always false here
+	 * and are sandboxed in every state.
 	 */
 	adSupported: boolean;
 	verified: boolean;
@@ -91,7 +97,7 @@ export const PROVIDERS: Provider[] = [
 	},
 	{
 		id: 'vidlink',
-		label: 'Server 2 · VidLink · ads when unsandboxed',
+		label: 'Server 2 · VidLink · 有廣告 Ads',
 		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie'
@@ -100,18 +106,18 @@ export const PROVIDERS: Provider[] = [
 		progressEvents: true,
 		adSupported: true,
 		verified: true,
-		note: 'VidLink is ad-funded. Sandboxed (Ad Mode off) it cannot redirect you, but it may refuse to play and show its own "Please Disable Sandbox" message. Turn on Ad Mode to let it play: a pop-up ad may open when you press play — close it once (tap X) and the movie plays.'
+		note: 'VidLink is ad-funded (tagged 有廣告 on its chip). Selecting it loads it unsandboxed: a pop-up ad may open when you press play — close it once (tap X) and the movie plays. We earn nothing from these ads — the provider forces them; they are not ours.'
 	},
 	{
 		id: 'vidfast',
-		label: 'Server 3 · VidFast · ads when unsandboxed',
+		label: 'Server 3 · VidFast · 有廣告 Ads',
 		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie' ? `https://vidfast.pro/movie/${id}` : `https://vidfast.pro/tv/${id}/${season}/${episode}`,
 		progressEvents: false,
 		adSupported: true,
 		verified: true,
-		note: 'VidFast is ad-funded. Sandboxed (Ad Mode off) it cannot redirect you, but it may refuse to play and show its own "Please Disable Sandbox" message. Turn on Ad Mode to let it play: a pop-up ad may open when you press play — close it once (tap X) and the movie plays.'
+		note: 'VidFast is ad-funded (tagged 有廣告 on its chip). Selecting it loads it unsandboxed: a pop-up ad may open when you press play — close it once (tap X) and the movie plays. We earn nothing from these ads — the provider forces them; they are not ours.'
 	}
 ];
 

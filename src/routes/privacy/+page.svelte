@@ -14,6 +14,7 @@
 
 	<h2>Third parties</h2>
 	<p>Movie and show metadata comes from TMDB when configured. Playback is embedded from third-party player servers (you can see and switch them on every watch page); those servers may see the request your browser makes to play a video, the same as visiting their site. Subtitle search, when enabled, uses OpenSubtitles. We do not control those services' privacy practices.</p>
+	<p>Some playback servers are ad-funded and carry a 有廣告 · Ads tag on the watch page; if you select one, any ad you see is forced by that server. 我哋唔會從呢啲廣告賺錢 — 廣告係 provider 強制顯示，同我哋無關。We earn nothing from these ads — the provider forces them; they are not ours.</p>
 
 	<h2>On your device</h2>
 	<p>If you never sign in, your lists and resume points live only in your browser's local storage on your own device, under your control.</p>

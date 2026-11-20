@@ -18,13 +18,15 @@ describe('provider registry', () => {
 		expect(PROVIDERS[0].id).toBe('demo');
 		expect(PROVIDERS[0].label).toContain('Server 1');
 	});
-	it('demoted ad-funded providers carry honest ads-when-unsandboxed labels and notes', () => {
+	it('ad-funded providers carry the 有廣告 tag on their chip label and an honest note', () => {
 		for (const id of ['vidlink', 'vidfast']) {
 			const p = providerById(id);
-			expect(p.label).toMatch(/ads when unsandboxed/i);
-			expect(p.note).toMatch(/sandbox/i);
-			expect(p.note).toMatch(/Ad Mode/);
+			expect(p.label).toContain('有廣告');
+			expect(p.label).toMatch(/\bAds\b/);
+			expect(p.note).toMatch(/unsandboxed/i);
+			expect(p.note).toMatch(/earn nothing/i);
 		}
+		expect(providerById('demo').label).not.toContain('有廣告');
 		expect(providerById('demo').note).toBeUndefined();
 	});
 	it('flags ad-supported providers explicitly; clean providers are never ad-supported', () => {

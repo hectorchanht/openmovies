@@ -7,12 +7,14 @@ import { describe, expect, it } from 'vitest';
 // refined the same day): the DEFAULT is always ad-free and sandboxed —
 // no forced ads, ever. But availability outranks ad-purity: sometimes
 // only the ad-supported providers (VidLink/VidFast) can actually play,
-// and the worst outcome is a user left with nothing to watch. So an
-// explicit, user-opened Ad Mode may render an adSupported provider's
-// iframe WITHOUT the sandbox — inside that mode only, for ad-supported
-// providers only. These tests pin exactly that contract: sandboxed by
-// default with the safe token set, and a single, doubly-gated
-// unsandboxed path. The vitest suite runs in a node environment (no DOM
+// and the worst outcome is a user left with nothing to watch. In the
+// lightest form of the ruling, the disclosure is a simple 有廣告 · Ads
+// tag on the provider chip itself: a user who taps a tagged provider
+// has knowingly opted in — that tap IS the consent — so a selected
+// adSupported provider renders WITHOUT the sandbox directly, with no
+// extra notices, dialogs or enable steps. These tests pin exactly that
+// contract: sandboxed by default with the safe token set, one
+// doubly-gated unsandboxed path, and the tag-tap as the only opt-in. The vitest suite runs in a node environment (no DOM
 // / testing-library in this repo), and the iframe only renders after
 // the resolver fills `src`, so this asserts the contract on the
 // component source itself — the exact place a regression would land.
@@ -92,13 +94,19 @@ describe('Ad Mode (Player.svelte)', () => {
 		expect(source).toContain('aria-pressed={adMode}');
 	});
 
-	it('offers the explicit opt-in button when an ad-funded server is blocked by the sandbox', () => {
-		expect(source).toContain('{#if currentProvider.adSupported && !adMode}');
-		expect(source).toContain('開廣告模式睇');
-		expect(source).toContain('setAdMode(true)');
+	it('treats tapping a tagged chip as the opt-in itself — it enables Ad Mode directly', () => {
+		expect(source).toContain('if (providerById(id).adSupported) setAdMode(true);');
 	});
 
-	it('reminds the user of the trade while Ad Mode is on for an ad-funded server', () => {
-		expect(source).toContain('廣告模式已開');
+	it('has NO extra gate for a tagged provider — no enable button, no notice block, no dialog', () => {
+		expect(source).not.toContain('開廣告模式睇');
+		expect(source).not.toContain('adnotice');
+		expect(source).not.toContain('{#if currentProvider.adSupported && !adMode}');
+	});
+
+	it('shows the one-line no-revenue note for a tagged provider — information, not a gate', () => {
+		expect(source).toContain('{#if currentProvider.adSupported}');
+		expect(source).toContain('我哋唔會從呢啲廣告賺錢');
+		expect(source).toContain('We earn nothing from these ads');
 	});
 });

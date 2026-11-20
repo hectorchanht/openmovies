@@ -15,12 +15,17 @@
 	// opt-in and sandboxed unless the user opens Ad Mode for an
 	// ad-supported server (see the iframe below).
 	let providerId = $state('demo');
-	// Ad Mode (Hector ruling 2026-11-20, refined): default OFF, persisted
-	// per device. ONLY when the user has explicitly turned it on AND the
-	// selected provider is ad-funded (adSupported) does that provider's
-	// iframe render without the sandbox — the trade the user chose: one
-	// pop-up ad, closed once, for a movie that actually plays. Clean
-	// providers are sandboxed in every mode.
+	// Ad Mode (Hector ruling 2026-11-20, lightest form): the disclosure
+	// is the 有廣告 · Ads tag on the provider chip itself. A user who
+	// taps a tagged provider has knowingly opted in — that tap IS the
+	// consent (see switchTo) — so a selected adSupported provider renders
+	// without the sandbox directly, no notices, dialogs or extra steps.
+	// Ad Mode state follows that selection, is persisted per device and
+	// stays sticky; the visible toggle can switch it back off, which
+	// re-sandboxes everything immediately. embedUnsandboxed below is the
+	// single gate: Ad Mode on AND an ad-supported provider. Clean
+	// providers are sandboxed in every state, and the default selection
+	// is always a clean one.
 	const AD_MODE_KEY = 'om_ad_mode';
 	let adMode = $state(false);
 	const currentProvider = $derived(providerById(providerId));
@@ -73,6 +78,10 @@
 	function switchTo(id: string) {
 		if (id !== providerId) store.noteServerSwitch();
 		providerId = id;
+		// Tapping a 有廣告-tagged chip IS the opt-in: it turns Ad Mode on
+		// (sticky) so the tagged provider loads unsandboxed right away —
+		// one tap from "can't play" to playing, no separate enable step.
+		if (providerById(id).adSupported) setAdMode(true);
 	}
 
 	onMount(() => {
@@ -157,18 +166,12 @@
 		</select>
 	</label>
 </div>
-{#if currentProvider.adSupported && !adMode}
-	<div class="adnotice">
-		<p class="small">呢個 Server 靠廣告運作，而家被 sandbox 擋住，多數播唔到。This server is ad-funded; sandboxed, it likely cannot play.</p>
-		<p class="small muted">開廣告模式之後，撳 Play 時可能彈一個廣告 — 撳一次交叉（X）閂咗佢，套戲就會播。With Ad Mode on, a pop-up ad may open when you press play — close it once (tap X) and the movie plays.</p>
-		<button class="btn primary" onclick={() => setAdMode(true)}>開廣告模式睇 Enable Ad Mode & play</button>
-	</div>
-{:else if currentProvider.adSupported}
-	<p class="small muted">廣告模式已開 Ad Mode is on — 撳 Play 時可能彈廣告，撳一次交叉（X）閂咗佢就得。A pop-up may appear on play; close it once.</p>
+{#if currentProvider.adSupported}
+	<p class="small muted">呢個 Server 有廣告：撳 Play 時可能彈廣告，撳一次交叉（X）閂咗佢就得。我哋唔會從呢啲廣告賺錢 — 廣告係 provider 強制顯示，同我哋無關。This server carries ads: a pop-up may appear when you press play — close it once (tap X). We earn nothing from these ads — the provider forces them; they are not ours.</p>
 {:else if currentProvider.note}
 	<p class="small muted">{currentProvider.note}</p>
 {/if}
-<p class="small muted">If a server is slow or down, switch servers — your place is kept. Third-party servers run sandboxed by default, so they can never redirect this tab or open pop-up ads; an ad-funded server runs unsandboxed only if you turn on Ad Mode yourself. Progress in the Demo Player is saved automatically; other servers keep their own resume.</p>
+<p class="small muted">If a server is slow or down, switch servers — your place is kept. Third-party servers run sandboxed by default, so they can never redirect this tab or open pop-up ads; a server tagged 有廣告 runs unsandboxed only when you select it — that selection is your opt-in. Progress in the Demo Player is saved automatically; other servers keep their own resume.</p>
 
 <style>
 	.player { position: relative; aspect-ratio: 16/9; background: #000; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }
@@ -178,8 +181,6 @@
 	.big { font-size: 16px; padding: 12px 26px; }
 	.seek { width: min(520px, 90%); accent-color: var(--accent); }
 	.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-top: 12px; }
-	.adnotice { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
-	.adnotice p { margin: 0; }
 	.servers { display: flex; flex-wrap: wrap; gap: 8px; }
 	.subs select { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin-left: 6px; }
 </style>
