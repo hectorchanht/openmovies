@@ -7,30 +7,56 @@
 	import type { Title } from '$lib/types';
 
 	const catalog = new TmdbCatalog(import.meta.env.PUBLIC_TMDB_API_KEY as string | undefined);
-	let titles = $state<Title[]>([]);
+	// G2 (2026-11-20): homepage rows are separate real feeds — trending
+	// movies, trending TV, and TMDB's real top_rated — not one shared
+	// trending pool sliced/sorted client-side.
+	let heroPool = $state<Title[]>([]);
+	let movieRow = $state<Title[]>([]);
+	let tvRow = $state<Title[]>([]);
+	let topRatedRow = $state<Title[]>([]);
+	let searchPool = $state<Title[] | null>(null);
 	let source = $state<'tmdb' | 'demo'>('demo');
 	let query = $state('');
 
 	onMount(async () => {
-		const c = await catalog.trending();
-		titles = c.titles; source = c.source;
+		const [all, movies, shows, topMovies, topShows] = await Promise.all([
+			catalog.trending(),
+			catalog.trendingMovies(),
+			catalog.trendingTv(),
+			catalog.topRated('movie'),
+			catalog.topRated('tv')
+		]);
+		heroPool = all.titles; source = all.source;
+		movieRow = movies.titles;
+		tvRow = shows.titles;
+		// Real top_rated from both media types, merged by rating.
+		topRatedRow = [...topMovies.titles, ...topShows.titles].sort((a, b) => b.rating - a.rating).slice(0, 20);
 	});
 
-	const byId = (id: number) => titles.find((t) => t.id === id);
+	// Lookup pool for Continue Watching / Because You Watched: every row
+	// plus any search results, deduped by type+id.
+	const allTitles = $derived.by(() => {
+		const seen = new Map<string, Title>();
+		for (const t of [...heroPool, ...movieRow, ...tvRow, ...topRatedRow, ...(searchPool ?? [])]) {
+			if (!seen.has(`${t.type}:${t.id}`)) seen.set(`${t.type}:${t.id}`, t);
+		}
+		return [...seen.values()];
+	});
+	const byId = (id: number) => allTitles.find((t) => t.id === id);
 	const cw = $derived(continueWatching(store.personal));
-	const featured = $derived(titles[0]);
-	const movies = $derived(titles.filter((t) => t.type === 'movie'));
-	const shows = $derived(titles.filter((t) => t.type === 'tv'));
-	const topRated = $derived([...titles].sort((a, b) => b.rating - a.rating).slice(0, 10));
+	const featured = $derived(heroPool[0]);
+	const movies = $derived(searchPool ? searchPool.filter((t) => t.type === 'movie') : movieRow);
+	const shows = $derived(searchPool ? searchPool.filter((t) => t.type === 'tv') : tvRow);
 	const because = $derived.by(() => {
 		const last = cw[0] ? byId(cw[0].titleId) : undefined;
 		if (!last) return [] as Title[];
-		return titles.filter((t) => t.id !== last.id && t.genres.some((g) => last.genres.includes(g))).slice(0, 8);
+		return allTitles.filter((t) => t.id !== last.id && t.genres.some((g) => last.genres.includes(g))).slice(0, 8);
 	});
 
 	async function doSearch() {
+		if (!query.trim()) { searchPool = null; return; }
 		const c = await catalog.search(query);
-		titles = c.titles; source = c.source;
+		searchPool = c.titles; source = c.source;
 	}
 </script>
 
@@ -76,8 +102,10 @@
 <div class="row-head"><h2>Trending Series</h2><a href="/browse?type=tv">Browse all →</a></div>
 <div class="scroller">{#each shows as t}<PosterCard title={t} />{/each}</div>
 
-<div class="row-head"><h2>Top Rated</h2></div>
-<div class="scroller">{#each topRated as t}<PosterCard title={t} />{/each}</div>
+{#if !searchPool}
+	<div class="row-head"><h2>Top Rated</h2></div>
+	<div class="scroller">{#each topRatedRow as t}<PosterCard title={t} />{/each}</div>
+{/if}
 
 <style>
 	.hero { border-radius: 18px; margin-top: 18px; border: 1px solid var(--line); overflow: hidden; }

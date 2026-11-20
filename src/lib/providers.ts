@@ -23,6 +23,15 @@ import { DEMO_TITLES } from './demo-data';
  * - demo     — our own simulated player. Always works; used for demo rows
  *              and as the honest fallback when nothing else loads.
  *
+ * P0 UPDATE (2026-11-20, Hector ruling — see REAL-CATALOGUE-BRIEF.md §1):
+ * opening a title must NEVER redirect/pop-under to an ad. VidLink served
+ * a whole-tab redirect to an ad host in production, and both VidLink and
+ * VidFast refuse to play inside a sandbox (their popunder is the revenue
+ * model). All provider iframes are therefore sandboxed (Player.svelte),
+ * VidLink/VidFast are DEMOTED behind the Demo Player with honest
+ * ads-when-unsandboxed labels, and the Demo Player is the default. Their
+ * adapters stay here (never deleted) for a future sandbox-clean retest.
+ *
  * REMOVED 2026-11-18 (dead hosts, verified by DNS from two networks):
  * vidsrc (vidsrc.icu AND dl.vidsrc.vip both NXDOMAIN) and vidking
  * (vidking.net unresolvable). VidSrc was the only download source, so no
@@ -48,36 +57,40 @@ export interface Provider {
 	/** True when the provider publishes progress postMessage events. */
 	progressEvents: boolean;
 	verified: boolean;
+	/** Honest user-facing warning shown when this server is selected. */
+	note?: string;
 }
 
 export const PROVIDERS: Provider[] = [
 	{
+		id: 'demo',
+		label: 'Server 1 · Demo Player',
+		capabilities: ['stream'],
+		build: () => 'about:blank',
+		progressEvents: false,
+		verified: true
+	},
+	{
 		id: 'vidlink',
-		label: 'Server 1 · VidLink',
+		label: 'Server 2 · VidLink · ads when unsandboxed',
 		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie'
 				? `https://vidlink.pro/movie/${id}?primaryColor=e8590c`
 				: `https://vidlink.pro/tv/${id}/${season}/${episode}?primaryColor=e8590c`,
 		progressEvents: true,
-		verified: true
+		verified: true,
+		note: 'VidLink serves ads and popunders when it is not sandboxed. OpenMovies always sandboxes it, so it cannot redirect you — but VidLink may refuse to play sandboxed and show its own "Please Disable Sandbox" message instead.'
 	},
 	{
 		id: 'vidfast',
-		label: 'Server 2 · VidFast',
+		label: 'Server 3 · VidFast · ads when unsandboxed',
 		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie' ? `https://vidfast.pro/movie/${id}` : `https://vidfast.pro/tv/${id}/${season}/${episode}`,
 		progressEvents: false,
-		verified: true
-	},
-	{
-		id: 'demo',
-		label: 'Server 3 · Demo Player',
-		capabilities: ['stream'],
-		build: () => 'about:blank',
-		progressEvents: false,
-		verified: true
+		verified: true,
+		note: 'VidFast serves ads and popunders when it is not sandboxed. OpenMovies always sandboxes it, so it cannot redirect you — but VidFast may refuse to play sandboxed and show its own "Please Disable Sandbox" message instead.'
 	}
 ];
 

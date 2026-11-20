@@ -22,26 +22,36 @@ PROJECT, HOST = "openmovies", "openmovies.dawnstudio.app"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 API_BASE = "https://openmovies-api.dawnstudio.app"
 
-# --- build with the API base baked in (fail-closed) ---
-env = {**os.environ, "PUBLIC_API_BASE": API_BASE}
+# --- build with the API base + TMDB key baked in (fail-closed) ---
+# PUBLIC_TMDB_API_KEY comes from the caller's environment only (a by-design
+# public v3 key that ships in the bundle). It is never printed or logged;
+# if it is unset the deploy ABORTS rather than shipping the demo catalogue.
+TMDB_KEY = os.environ.get("PUBLIC_TMDB_API_KEY", "")
+if not TMDB_KEY:
+    raise SystemExit(
+        "ABORT: PUBLIC_TMDB_API_KEY is not set in the environment — the web "
+        "bundle would fall back to the demo catalogue. Refusing to deploy.")
+env = {**os.environ, "PUBLIC_API_BASE": API_BASE, "PUBLIC_TMDB_API_KEY": TMDB_KEY}
 subprocess.run(["npm", "run", "build"], cwd=ROOT, env=env, check=True)
 build_dir = os.path.join(ROOT, "build")
-needle = API_BASE.encode()
-found = False
-for dirpath, _dirs, files in os.walk(build_dir):
-    for name in files:
-        with open(os.path.join(dirpath, name), "rb") as f:
-            if needle in f.read():
-                found = True
-                break
-    if found:
-        break
-if not found:
+def bundle_contains(needle: bytes) -> bool:
+    for dirpath, _dirs, files in os.walk(build_dir):
+        for name in files:
+            with open(os.path.join(dirpath, name), "rb") as f:
+                if needle in f.read():
+                    return True
+    return False
+if not bundle_contains(API_BASE.encode()):
     raise SystemExit(
         f"ABORT: {API_BASE} not found anywhere in build/ — PUBLIC_API_BASE did "
         "not make it into the bundle, so apiConfigured() would be false in "
         "production. Refusing to deploy an API-less web tier.")
-print("pre-flight OK: bundle contains PUBLIC_API_BASE =", API_BASE)
+if not bundle_contains(TMDB_KEY.encode()):
+    raise SystemExit(
+        "ABORT: the TMDB key was not found anywhere in build/ — "
+        "PUBLIC_TMDB_API_KEY did not make it into the bundle, so the site "
+        "would serve the demo catalogue. Refusing to deploy.")
+print("pre-flight OK: bundle contains PUBLIC_API_BASE =", API_BASE, "+ TMDB key (value withheld)")
 
 def cf(method, path, data=None):
     body = json.dumps(data).encode() if data is not None else None

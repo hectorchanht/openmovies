@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { PROVIDERS, parseProgressMessage, providerMarker } from '$lib/providers';
+	import { PROVIDERS, parseProgressMessage, providerById, providerMarker } from '$lib/providers';
 	import { BUILTIN_TRACKS, searchSubtitles, type SubtitleTrack } from '$lib/subtitles';
 	import { resolveSource } from '$lib/resolve';
 	import { fetchProviderHealth } from '$lib/api';
@@ -10,7 +10,10 @@
 
 	let { title, season = 1, episode = 1 }: { title: Title; season?: number; episode?: number } = $props();
 
-	let providerId = $state('vidlink');
+	// Default is the Demo Player (P0, 2026-11-20): it is the only player
+	// verified to never serve an ad redirect. Third-party servers are
+	// opt-in and always sandboxed (see the iframe below).
+	let providerId = $state('demo');
 	let tracks = $state<SubtitleTrack[]>(BUILTIN_TRACKS);
 	let track = $state('en');
 	// Demo (simulated) player state
@@ -59,8 +62,8 @@
 		void fetchProviderHealth().then((health) => {
 			if (!health) return;
 			// Deliberately NO failover here: an edge-probe failure is not
-			// evidence about this device's reachability, so the initial
-			// server stays the listed Server 1 (see providerMarker).
+			// evidence about this device's reachability, so the selected
+			// server never changes on probe data (see providerMarker).
 			unconfirmedIds = health.filter((p) => !p.ok).map((p) => p.id);
 		});
 		void searchSubtitles({ tmdbId: title.id, type: title.type, season, episode }).then((t) => (tracks = t));
@@ -96,11 +99,17 @@
 			<p class="small muted">{fmt(pos)} / {fmt(duration)}</p>
 		</div>
 	{:else if src}
-		<!-- No sandbox attribute: embed providers (VidLink first of all) refuse
-		     to run sandboxed and render "Please Disable Sandbox" instead —
-		     Hector's iPad report, 2026-11-18. Parity with BingeBang-class
-		     embeds, which are never sandboxed. -->
-		<iframe bind:this={frame} title={`Player — ${title.name}`} src={src} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
+		<!-- P0 sandbox (Hector ruling 2026-11-20, REAL-CATALOGUE-BRIEF.md §1):
+		     EVERY provider iframe is sandboxed with exactly the safe token
+		     set in the attribute below — no top-navigation token and no
+		     popup token of any kind (the contract test spells them out and
+		     fails if one ever appears) — so the browser itself blocks the
+		     popunder / whole-tab ad redirect an unsandboxed embed served
+		     in production on 2026-11-20. VidLink/VidFast detect the sandbox
+		     and may refuse to play ("Please Disable Sandbox"); that is
+		     accepted — the Free, No Ads promise outranks any provider,
+		     which is why they are demoted and the Demo Player is default. -->
+		<iframe bind:this={frame} title={`Player — ${title.name}`} src={src} sandbox="allow-scripts allow-same-origin allow-presentation" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
 	{:else}
 		<div class="stage"><p class="muted small">Loading server…</p></div>
 	{/if}
@@ -118,7 +127,8 @@
 		</select>
 	</label>
 </div>
-<p class="small muted">If a server is slow or down, switch servers — your place is kept. Progress from Server 1 is saved automatically; other servers keep their own resume.</p>
+{#if providerById(providerId).note}<p class="small muted">{providerById(providerId).note}</p>{/if}
+<p class="small muted">If a server is slow or down, switch servers — your place is kept. Third-party servers run sandboxed, so they can never redirect this tab or open pop-up ads. Progress in the Demo Player is saved automatically; other servers keep their own resume.</p>
 
 <style>
 	.player { position: relative; aspect-ratio: 16/9; background: #000; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }

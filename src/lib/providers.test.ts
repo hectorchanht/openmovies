@@ -13,9 +13,18 @@ describe('provider registry', () => {
 			'https://vidfast.pro/tv/1396/1/2'
 		);
 	});
-	it('has at least 2 real providers plus the demo fallback, demo last', () => {
+	it('has at least 2 real providers plus the demo fallback, demo FIRST (P0 default, 2026-11-20)', () => {
 		expect(PROVIDERS.length).toBeGreaterThanOrEqual(3);
-		expect(PROVIDERS[PROVIDERS.length - 1].id).toBe('demo');
+		expect(PROVIDERS[0].id).toBe('demo');
+		expect(PROVIDERS[0].label).toContain('Server 1');
+	});
+	it('demoted ad-funded providers carry honest ads-when-unsandboxed labels and notes', () => {
+		for (const id of ['vidlink', 'vidfast']) {
+			const p = providerById(id);
+			expect(p.label).toMatch(/ads when unsandboxed/i);
+			expect(p.note).toMatch(/sandbox/i);
+		}
+		expect(providerById('demo').note).toBeUndefined();
 	});
 	it('never points at the dead VidSrc / VidKing hosts (removed 2026-11-18, both NXDOMAIN)', () => {
 		for (const p of PROVIDERS) {

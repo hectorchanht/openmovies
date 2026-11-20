@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checkDomain, normalizeHost } from './checker';
-import { filterTitles, mapTmdb, TmdbCatalog } from './tmdb';
+import { filterTitles, genreMapFromList, mapTmdb, TmdbCatalog } from './tmdb';
 import { DEMO_TITLES } from './demo-data';
 import { BUILTIN_TRACKS, opensubtitlesSearchUrl, searchSubtitles } from './subtitles';
 
@@ -55,6 +55,143 @@ describe('TMDB adapter', () => {
 		expect(r.length).toBeGreaterThan(0);
 		expect(r.every((t) => t.type === 'tv' && t.genres.includes('Drama'))).toBe(true);
 		expect(filterTitles(DEMO_TITLES, { query: 'wick' }).map((t) => t.name)).toEqual(['John Wick: Chapter 4']);
+	});
+});
+
+describe('TMDB genre mapping (G1) + split rows (G2)', () => {
+	// Realistic TMDB shapes: list responses carry genre_ids (numbers),
+	// genre lists carry { id, name } objects. Ids are the real TMDB ids.
+	const MOVIE_GENRES = { genres: [{ id: 28, name: 'Action' }, { id: 878, name: 'Science Fiction' }, { id: 18, name: 'Drama' }] };
+	const TV_GENRES = { genres: [{ id: 18, name: 'Drama' }, { id: 10765, name: 'Sci-Fi & Fantasy' }, { id: 35, name: 'Comedy' }] };
+
+	/** Fetch mock that routes by URL substring and (optionally) counts calls per route. */
+	function routedFetch(routes: Record<string, unknown>, counts?: Record<string, number>) {
+		return (async (url: string) => {
+			for (const [needle, payload] of Object.entries(routes)) {
+				if (url.includes(needle)) {
+					if (counts) counts[needle] = (counts[needle] ?? 0) + 1;
+					return new Response(JSON.stringify(payload), { status: 200 });
+				}
+			}
+			return new Response('', { status: 404 });
+		}) as typeof fetch;
+	}
+
+	it('genreMapFromList builds an id→name map and tolerates junk', () => {
+		const m = genreMapFromList(MOVIE_GENRES);
+		expect(m.get(28)).toBe('Action');
+		expect(m.get(878)).toBe('Science Fiction');
+		expect(genreMapFromList(null).size).toBe(0);
+		expect(genreMapFromList({ genres: 'nope' }).size).toBe(0);
+		expect(genreMapFromList({ results: [] }).size).toBe(0);
+	});
+
+	it('mapTmdb maps genre_ids through the genre map; detail genre objects win', () => {
+		const map = genreMapFromList(MOVIE_GENRES);
+		const t = mapTmdb(
+			{ id: 27205, title: 'Inception', release_date: '2010-07-16', vote_average: 8.4, genre_ids: [28, 878, 99999] },
+			'movie', 0, map
+		);
+		expect(t.genres).toEqual(['Action', 'Science Fiction']); // unknown id dropped
+		const detail = mapTmdb(
+			{ id: 1, title: 'X', release_date: '2020-01-01', vote_average: 7, genres: [{ name: 'Drama' }], genre_ids: [28] },
+			'movie', 0, map
+		);
+		expect(detail.genres).toEqual(['Drama']);
+		const noMap = mapTmdb({ id: 1, title: 'X', release_date: '2020-01-01', genre_ids: [28] }, 'movie');
+		expect(noMap.genres).toEqual([]);
+	});
+
+	it('live trending maps genre_ids to names via the fetched genre lists', async () => {
+		const fetchFn = routedFetch({
+			'/genre/movie/list': MOVIE_GENRES,
+			'/genre/tv/list': TV_GENRES,
+			'/trending/all/week': {
+				results: [
+					{ id: 27205, media_type: 'movie', title: 'Inception', release_date: '2010-07-16', vote_average: 8.4, genre_ids: [28, 878] },
+					{ id: 1396, media_type: 'tv', name: 'Breaking Bad', first_air_date: '2008-01-20', vote_average: 9.5, genre_ids: [18] }
+				]
+			}
+		});
+		const c = new TmdbCatalog('test-key', fetchFn);
+		const r = await c.trending();
+		expect(r.source).toBe('tmdb');
+		expect(r.titles[0].genres).toEqual(['Action', 'Science Fiction']);
+		expect(r.titles[1].genres).toEqual(['Drama']);
+	});
+
+	it('genre lists are fetched once per type and cached across calls', async () => {
+		const counts: Record<string, number> = {};
+		const fetchFn = routedFetch({
+			'/genre/movie/list': MOVIE_GENRES,
+			'/genre/tv/list': TV_GENRES,
+			'/trending/movie/week': { results: [{ id: 1, title: 'A', release_date: '2020-01-01', vote_average: 7, genre_ids: [28] }] },
+			'/trending/tv/week': { results: [{ id: 2, name: 'B', first_air_date: '2021-01-01', vote_average: 8, genre_ids: [35] }] }
+		}, counts);
+		const c = new TmdbCatalog('test-key', fetchFn);
+		await c.trendingMovies();
+		await c.trendingTv();
+		await c.trendingMovies();
+		expect(counts['/genre/movie/list']).toBe(1);
+		expect(counts['/genre/tv/list']).toBe(1);
+	});
+
+	it('a genre-list outage degrades to empty genres, never a failure', async () => {
+		const fetchFn = (async (url: string) => {
+			if (url.includes('/genre/')) return new Response('', { status: 500 });
+			return new Response(JSON.stringify({ results: [{ id: 1, title: 'A', release_date: '2020-01-01', vote_average: 7, genre_ids: [28] }] }), { status: 200 });
+		}) as typeof fetch;
+		const c = new TmdbCatalog('test-key', fetchFn);
+		const r = await c.trendingMovies();
+		expect(r.source).toBe('tmdb');
+		expect(r.titles[0].genres).toEqual([]);
+	});
+
+	it('trendingMovies / trendingTv use the type-specific endpoints (results carry no media_type)', async () => {
+		const fetchFn = routedFetch({
+			'/genre/movie/list': MOVIE_GENRES,
+			'/genre/tv/list': TV_GENRES,
+			'/trending/movie/week': { results: [{ id: 1, title: 'Movie A', release_date: '2020-01-01', vote_average: 7, genre_ids: [28] }] },
+			'/trending/tv/week': { results: [{ id: 2, name: 'Show B', first_air_date: '2021-01-01', vote_average: 8, genre_ids: [10765] }] }
+		});
+		const c = new TmdbCatalog('test-key', fetchFn);
+		const m = await c.trendingMovies();
+		expect(m.source).toBe('tmdb');
+		expect(m.titles).toHaveLength(1);
+		expect(m.titles[0]).toMatchObject({ type: 'movie', name: 'Movie A', genres: ['Action'] });
+		const tv = await c.trendingTv();
+		expect(tv.titles[0]).toMatchObject({ type: 'tv', name: 'Show B', genres: ['Sci-Fi & Fantasy'] });
+	});
+
+	it('topRated reads the real /top_rated endpoints, not the trending pool', async () => {
+		const fetchFn = routedFetch({
+			'/genre/movie/list': MOVIE_GENRES,
+			'/genre/tv/list': TV_GENRES,
+			'/movie/top_rated': { results: [{ id: 278, title: 'The Shawshank Redemption', release_date: '1994-09-23', vote_average: 9.3, genre_ids: [18] }] },
+			'/tv/top_rated': { results: [{ id: 1396, name: 'Breaking Bad', first_air_date: '2008-01-20', vote_average: 9.5, genre_ids: [18] }] }
+		});
+		const c = new TmdbCatalog('test-key', fetchFn);
+		const m = await c.topRated('movie');
+		expect(m.source).toBe('tmdb');
+		expect(m.titles[0]).toMatchObject({ name: 'The Shawshank Redemption', rating: 9.3, genres: ['Drama'] });
+		const tv = await c.topRated('tv');
+		expect(tv.titles[0]).toMatchObject({ type: 'tv', name: 'Breaking Bad' });
+	});
+
+	it('demo fallback works for every new row method without a key', async () => {
+		const c = new TmdbCatalog(undefined);
+		const m = await c.trendingMovies();
+		expect(m.source).toBe('demo');
+		expect(m.titles.length).toBeGreaterThan(0);
+		expect(m.titles.every((t) => t.type === 'movie')).toBe(true);
+		const tv = await c.trendingTv();
+		expect(tv.source).toBe('demo');
+		expect(tv.titles.every((t) => t.type === 'tv')).toBe(true);
+		const top = await c.topRated('movie');
+		expect(top.source).toBe('demo');
+		expect(top.titles.every((t) => t.type === 'movie')).toBe(true);
+		const ratings = top.titles.map((t) => t.rating);
+		expect(ratings).toEqual([...ratings].sort((a, b) => b - a));
 	});
 });
 
