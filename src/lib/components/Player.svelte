@@ -12,8 +12,27 @@
 
 	// Default is the Demo Player (P0, 2026-11-20): it is the only player
 	// verified to never serve an ad redirect. Third-party servers are
-	// opt-in and always sandboxed (see the iframe below).
+	// opt-in and sandboxed unless the user opens Ad Mode for an
+	// ad-supported server (see the iframe below).
 	let providerId = $state('demo');
+	// Ad Mode (Hector ruling 2026-11-20, refined): default OFF, persisted
+	// per device. ONLY when the user has explicitly turned it on AND the
+	// selected provider is ad-funded (adSupported) does that provider's
+	// iframe render without the sandbox — the trade the user chose: one
+	// pop-up ad, closed once, for a movie that actually plays. Clean
+	// providers are sandboxed in every mode.
+	const AD_MODE_KEY = 'om_ad_mode';
+	let adMode = $state(false);
+	const currentProvider = $derived(providerById(providerId));
+	const embedUnsandboxed = $derived(adMode && currentProvider.adSupported);
+	function setAdMode(on: boolean) {
+		adMode = on;
+		try {
+			localStorage.setItem(AD_MODE_KEY, on ? '1' : '0');
+		} catch {
+			/* storage unavailable (private mode etc.) — the mode just won't persist */
+		}
+	}
 	let tracks = $state<SubtitleTrack[]>(BUILTIN_TRACKS);
 	let track = $state('en');
 	// Demo (simulated) player state
@@ -57,6 +76,11 @@
 	}
 
 	onMount(() => {
+		try {
+			adMode = localStorage.getItem(AD_MODE_KEY) === '1';
+		} catch {
+			/* storage unavailable — Ad Mode stays off, the safe default */
+		}
 		const existing = store.personal.resume[key];
 		if (existing) pos = existing.positionSec;
 		void fetchProviderHealth().then((health) => {
@@ -99,17 +123,22 @@
 			<p class="small muted">{fmt(pos)} / {fmt(duration)}</p>
 		</div>
 	{:else if src}
-		<!-- P0 sandbox (Hector ruling 2026-11-20, REAL-CATALOGUE-BRIEF.md §1):
-		     EVERY provider iframe is sandboxed with exactly the safe token
-		     set in the attribute below — no top-navigation token and no
-		     popup token of any kind (the contract test spells them out and
-		     fails if one ever appears) — so the browser itself blocks the
-		     popunder / whole-tab ad redirect an unsandboxed embed served
-		     in production on 2026-11-20. VidLink/VidFast detect the sandbox
-		     and may refuse to play ("Please Disable Sandbox"); that is
-		     accepted — the Free, No Ads promise outranks any provider,
-		     which is why they are demoted and the Demo Player is default. -->
-		<iframe bind:this={frame} title={`Player — ${title.name}`} src={src} sandbox="allow-scripts allow-same-origin allow-presentation" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
+		<!-- Sandbox contract (Hector rulings 2026-11-20): the iframe is
+		     sandboxed with exactly the safe token set below — no
+		     top-navigation token and no popup token of any kind (the
+		     contract test spells them out and fails if one ever appears) —
+		     so the browser itself blocks the popunder / whole-tab ad
+		     redirect an unsandboxed embed served in production. The ONE
+		     exception is Ad Mode: embedUnsandboxed (Ad Mode on AND this
+		     provider is adSupported) is the only path to an iframe without
+		     a sandbox, and it exists because availability outranks
+		     ad-purity — sandboxed, ad-funded providers refuse to play at
+		     all. The key block forces a fresh iframe when the sandbox
+		     state flips, because browsers apply sandbox flags only at
+		     navigation time. -->
+		{#key embedUnsandboxed}
+			<iframe bind:this={frame} title={`Player — ${title.name}`} src={src} sandbox={embedUnsandboxed ? undefined : 'allow-scripts allow-same-origin allow-presentation'} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
+		{/key}
 	{:else}
 		<div class="stage"><p class="muted small">Loading server…</p></div>
 	{/if}
@@ -121,14 +150,25 @@
 			<button class="chip" class:on={providerId === p.id} onclick={() => switchTo(p.id)}>{p.label}{providerMarker(p, unconfirmedIds)}</button>
 		{/each}
 	</div>
+	<button class="chip" class:on={adMode} onclick={() => setAdMode(!adMode)} aria-pressed={adMode}>廣告模式 Ad Mode · {adMode ? 'ON' : 'OFF'}</button>
 	<label class="subs small muted">Subtitles
 		<select bind:value={track}>
 			{#each tracks as t}<option value={t.lang}>{t.label}</option>{/each}
 		</select>
 	</label>
 </div>
-{#if providerById(providerId).note}<p class="small muted">{providerById(providerId).note}</p>{/if}
-<p class="small muted">If a server is slow or down, switch servers — your place is kept. Third-party servers run sandboxed, so they can never redirect this tab or open pop-up ads. Progress in the Demo Player is saved automatically; other servers keep their own resume.</p>
+{#if currentProvider.adSupported && !adMode}
+	<div class="adnotice">
+		<p class="small">呢個 Server 靠廣告運作，而家被 sandbox 擋住，多數播唔到。This server is ad-funded; sandboxed, it likely cannot play.</p>
+		<p class="small muted">開廣告模式之後，撳 Play 時可能彈一個廣告 — 撳一次交叉（X）閂咗佢，套戲就會播。With Ad Mode on, a pop-up ad may open when you press play — close it once (tap X) and the movie plays.</p>
+		<button class="btn primary" onclick={() => setAdMode(true)}>開廣告模式睇 Enable Ad Mode & play</button>
+	</div>
+{:else if currentProvider.adSupported}
+	<p class="small muted">廣告模式已開 Ad Mode is on — 撳 Play 時可能彈廣告，撳一次交叉（X）閂咗佢就得。A pop-up may appear on play; close it once.</p>
+{:else if currentProvider.note}
+	<p class="small muted">{currentProvider.note}</p>
+{/if}
+<p class="small muted">If a server is slow or down, switch servers — your place is kept. Third-party servers run sandboxed by default, so they can never redirect this tab or open pop-up ads; an ad-funded server runs unsandboxed only if you turn on Ad Mode yourself. Progress in the Demo Player is saved automatically; other servers keep their own resume.</p>
 
 <style>
 	.player { position: relative; aspect-ratio: 16/9; background: #000; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }
@@ -138,6 +178,8 @@
 	.big { font-size: 16px; padding: 12px 26px; }
 	.seek { width: min(520px, 90%); accent-color: var(--accent); }
 	.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-top: 12px; }
+	.adnotice { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+	.adnotice p { margin: 0; }
 	.servers { display: flex; flex-wrap: wrap; gap: 8px; }
 	.subs select { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin-left: 6px; }
 </style>

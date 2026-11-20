@@ -32,6 +32,15 @@ import { DEMO_TITLES } from './demo-data';
  * ads-when-unsandboxed labels, and the Demo Player is the default. Their
  * adapters stay here (never deleted) for a future sandbox-clean retest.
  *
+ * AD MODE UPDATE (2026-11-20, Hector refined ruling, same day): availability
+ * outranks ad-purity — sometimes only the ad-supported providers can
+ * actually play, and the worst outcome is a user left with nothing to
+ * watch. So an explicit, user-opened Ad Mode (Player.svelte, default OFF,
+ * persisted per device) renders an `adSupported` provider's iframe
+ * WITHOUT the sandbox — inside that mode only, and for ad-supported
+ * providers only. The default stays ad-free and sandboxed; clean
+ * providers are sandboxed in every mode.
+ *
  * REMOVED 2026-11-18 (dead hosts, verified by DNS from two networks):
  * vidsrc (vidsrc.icu AND dl.vidsrc.vip both NXDOMAIN) and vidking
  * (vidking.net unresolvable). VidSrc was the only download source, so no
@@ -56,6 +65,15 @@ export interface Provider {
 	buildDownload?: (t: { id: number; type: 'movie' | 'tv'; season?: number; episode?: number }) => string;
 	/** True when the provider publishes progress postMessage events. */
 	progressEvents: boolean;
+	/**
+	 * True when the provider is funded by ads/popunders and therefore
+	 * refuses to play while sandboxed. An adSupported provider renders
+	 * UNSANDBOXED only when the user has explicitly turned Ad Mode on
+	 * (Player.svelte); in every other state it stays sandboxed like
+	 * every other provider. Clean providers are always false here and
+	 * are sandboxed in every mode.
+	 */
+	adSupported: boolean;
 	verified: boolean;
 	/** Honest user-facing warning shown when this server is selected. */
 	note?: string;
@@ -68,6 +86,7 @@ export const PROVIDERS: Provider[] = [
 		capabilities: ['stream'],
 		build: () => 'about:blank',
 		progressEvents: false,
+		adSupported: false,
 		verified: true
 	},
 	{
@@ -79,8 +98,9 @@ export const PROVIDERS: Provider[] = [
 				? `https://vidlink.pro/movie/${id}?primaryColor=e8590c`
 				: `https://vidlink.pro/tv/${id}/${season}/${episode}?primaryColor=e8590c`,
 		progressEvents: true,
+		adSupported: true,
 		verified: true,
-		note: 'VidLink serves ads and popunders when it is not sandboxed. OpenMovies always sandboxes it, so it cannot redirect you — but VidLink may refuse to play sandboxed and show its own "Please Disable Sandbox" message instead.'
+		note: 'VidLink is ad-funded. Sandboxed (Ad Mode off) it cannot redirect you, but it may refuse to play and show its own "Please Disable Sandbox" message. Turn on Ad Mode to let it play: a pop-up ad may open when you press play — close it once (tap X) and the movie plays.'
 	},
 	{
 		id: 'vidfast',
@@ -89,8 +109,9 @@ export const PROVIDERS: Provider[] = [
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie' ? `https://vidfast.pro/movie/${id}` : `https://vidfast.pro/tv/${id}/${season}/${episode}`,
 		progressEvents: false,
+		adSupported: true,
 		verified: true,
-		note: 'VidFast serves ads and popunders when it is not sandboxed. OpenMovies always sandboxes it, so it cannot redirect you — but VidFast may refuse to play sandboxed and show its own "Please Disable Sandbox" message instead.'
+		note: 'VidFast is ad-funded. Sandboxed (Ad Mode off) it cannot redirect you, but it may refuse to play and show its own "Please Disable Sandbox" message. Turn on Ad Mode to let it play: a pop-up ad may open when you press play — close it once (tap X) and the movie plays.'
 	}
 ];
 

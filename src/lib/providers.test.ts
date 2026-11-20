@@ -23,8 +23,18 @@ describe('provider registry', () => {
 			const p = providerById(id);
 			expect(p.label).toMatch(/ads when unsandboxed/i);
 			expect(p.note).toMatch(/sandbox/i);
+			expect(p.note).toMatch(/Ad Mode/);
 		}
 		expect(providerById('demo').note).toBeUndefined();
+	});
+	it('flags ad-supported providers explicitly; clean providers are never ad-supported', () => {
+		// Ad Mode may only unsandbox a provider whose adSupported flag is
+		// true — the flag is the registry half of that gate (Player.svelte
+		// holds the other half), so every provider must declare it.
+		for (const p of PROVIDERS) expect(typeof p.adSupported).toBe('boolean');
+		expect(providerById('vidlink').adSupported).toBe(true);
+		expect(providerById('vidfast').adSupported).toBe(true);
+		expect(providerById('demo').adSupported).toBe(false);
 	});
 	it('never points at the dead VidSrc / VidKing hosts (removed 2026-11-18, both NXDOMAIN)', () => {
 		for (const p of PROVIDERS) {
