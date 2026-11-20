@@ -10,11 +10,13 @@
 
 	let { title, season = 1, episode = 1 }: { title: Title; season?: number; episode?: number } = $props();
 
-	// Default is the Demo Player (P0, 2026-11-20): it is the only player
-	// verified to never serve an ad redirect. Third-party servers are
-	// opt-in and sandboxed unless the user opens Ad Mode for an
-	// ad-supported server (see the iframe below).
-	let providerId = $state('demo');
+	// Default is EmbedWave (2026-11-20): verified in a real-browser
+	// harness to play inside the exact P0 sandbox with no popup, no
+	// redirect and no sandbox refusal — the first real provider that
+	// satisfies the sandbox contract. The Demo Player is the simulated
+	// fallback (Server 2). Ad-supported servers are opt-in via their
+	// 有廣告 tag unless the user opens Ad Mode (see the iframe below).
+	let providerId = $state('embedwave');
 	// Ad Mode (Hector ruling 2026-11-20, lightest form): the disclosure
 	// is the 有廣告 · Ads tag on the provider chip itself. A user who
 	// taps a tagged provider has knowingly opted in — that tap IS the

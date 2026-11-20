@@ -7,16 +7,32 @@ describe('provider registry', () => {
 		expect(p.build({ id: 27205, type: 'movie' })).toContain('https://vidlink.pro/movie/27205');
 		expect(p.build({ id: 1396, type: 'tv', season: 2, episode: 3 })).toContain('https://vidlink.pro/tv/1396/2/3');
 	});
+	it('builds EmbedWave URLs from TMDB ids (patterns from embedwave.cc/docs)', () => {
+		expect(providerById('embedwave').build({ id: 577922, type: 'movie' })).toBe(
+			'https://embedwave.cc/embed/movie/577922'
+		);
+		expect(providerById('embedwave').build({ id: 1399, type: 'tv', season: 1, episode: 1 })).toBe(
+			'https://embedwave.cc/embed/tv/1399/1/1'
+		);
+		expect(providerById('embedwave').build({ id: 1396, type: 'tv', season: 2, episode: 3 })).toBe(
+			'https://embedwave.cc/embed/tv/1396/2/3'
+		);
+	});
 	it('builds VidFast URLs from TMDB ids', () => {
 		expect(providerById('vidfast').build({ id: 155, type: 'movie' })).toBe('https://vidfast.pro/movie/155');
 		expect(providerById('vidfast').build({ id: 1396, type: 'tv', season: 1, episode: 2 })).toBe(
 			'https://vidfast.pro/tv/1396/1/2'
 		);
 	});
-	it('has at least 2 real providers plus the demo fallback, demo FIRST (P0 default, 2026-11-20)', () => {
-		expect(PROVIDERS.length).toBeGreaterThanOrEqual(3);
-		expect(PROVIDERS[0].id).toBe('demo');
+	it('has EmbedWave FIRST as Server 1 (verified sandbox-clean default, 2026-11-20), demo second', () => {
+		expect(PROVIDERS.length).toBeGreaterThanOrEqual(4);
+		expect(PROVIDERS[0].id).toBe('embedwave');
 		expect(PROVIDERS[0].label).toContain('Server 1');
+		expect(PROVIDERS[0].label).toContain('EmbedWave');
+		expect(PROVIDERS[1].id).toBe('demo');
+		expect(PROVIDERS[1].label).toContain('Server 2');
+		expect(providerById('vidlink').label).toContain('Server 3');
+		expect(providerById('vidfast').label).toContain('Server 4');
 	});
 	it('ad-funded providers carry the 有廣告 tag on their chip label and an honest note', () => {
 		for (const id of ['vidlink', 'vidfast']) {
@@ -28,6 +44,7 @@ describe('provider registry', () => {
 		}
 		expect(providerById('demo').label).not.toContain('有廣告');
 		expect(providerById('demo').note).toBeUndefined();
+		expect(providerById('embedwave').label).not.toContain('有廣告');
 	});
 	it('flags ad-supported providers explicitly; clean providers are never ad-supported', () => {
 		// Ad Mode may only unsandbox a provider whose adSupported flag is
@@ -37,6 +54,7 @@ describe('provider registry', () => {
 		expect(providerById('vidlink').adSupported).toBe(true);
 		expect(providerById('vidfast').adSupported).toBe(true);
 		expect(providerById('demo').adSupported).toBe(false);
+		expect(providerById('embedwave').adSupported).toBe(false);
 	});
 	it('never points at the dead VidSrc / VidKing hosts (removed 2026-11-18, both NXDOMAIN)', () => {
 		for (const p of PROVIDERS) {
@@ -85,6 +103,7 @@ describe('download capability', () => {
 		const ids = downloadOptions({ id: 1, type: 'movie' }).map((o) => o.provider.id);
 		expect(ids).not.toContain('vidlink');
 		expect(ids).not.toContain('demo');
+		expect(ids).not.toContain('embedwave');
 	});
 });
 

@@ -23,14 +23,25 @@ import { DEMO_TITLES } from './demo-data';
  * - demo     — our own simulated player. Always works; used for demo rows
  *              and as the honest fallback when nothing else loads.
  *
+ * EMBEDWAVE UPDATE (2026-11-20): embedwave.cc was VERIFIED sandbox-clean
+ * in a real-browser harness the same day — inside an iframe carrying
+ * exactly sandbox="allow-scripts allow-same-origin allow-presentation"
+ * it loaded, scanned its sources and PLAYED (Tenet, TMDB 577922, Nitro
+ * source 480p): no popup, no new tab, no top redirect, no sandbox
+ * refusal. URL patterns are from its own docs (embedwave.cc/docs):
+ * /embed/movie/{tmdb_id} and /embed/tv/{tmdb_id}/{season}/{episode}.
+ * It is therefore Server 1 and the DEFAULT provider — the first real
+ * provider that satisfies the P0 sandbox contract. Every other candidate
+ * tested that day (Videasy, VidSrc.to, 2Embed, MultiEmbed, VidSrc.pk)
+ * was disqualified on observed evidence.
+ *
  * P0 UPDATE (2026-11-20, Hector ruling — see REAL-CATALOGUE-BRIEF.md §1):
  * opening a title must NEVER redirect/pop-under to an ad. VidLink served
  * a whole-tab redirect to an ad host in production, and both VidLink and
  * VidFast refuse to play inside a sandbox (their popunder is the revenue
- * model). All provider iframes are therefore sandboxed (Player.svelte),
- * VidLink/VidFast are DEMOTED behind the Demo Player with honest
- * ads-when-unsandboxed labels, and the Demo Player is the default. Their
- * adapters stay here (never deleted) for a future sandbox-clean retest.
+ * model). All provider iframes are therefore sandboxed (Player.svelte)
+ * by default, and VidLink/VidFast sit behind the clean providers with
+ * honest 有廣告 tags. Their adapters stay here (never deleted).
  *
  * AD MODE UPDATE (2026-11-20, Hector refined ruling, same day, lightest
  * form): availability outranks ad-purity — sometimes only the
@@ -87,8 +98,20 @@ export interface Provider {
 
 export const PROVIDERS: Provider[] = [
 	{
+		id: 'embedwave',
+		label: 'Server 1 · EmbedWave',
+		capabilities: ['stream'],
+		build: ({ id, type, season = 1, episode = 1 }) =>
+			type === 'movie'
+				? `https://embedwave.cc/embed/movie/${id}`
+				: `https://embedwave.cc/embed/tv/${id}/${season}/${episode}`,
+		progressEvents: false,
+		adSupported: false,
+		verified: true
+	},
+	{
 		id: 'demo',
-		label: 'Server 1 · Demo Player',
+		label: 'Server 2 · Demo Player',
 		capabilities: ['stream'],
 		build: () => 'about:blank',
 		progressEvents: false,
@@ -97,7 +120,7 @@ export const PROVIDERS: Provider[] = [
 	},
 	{
 		id: 'vidlink',
-		label: 'Server 2 · VidLink · 有廣告 Ads',
+		label: 'Server 3 · VidLink · 有廣告 Ads',
 		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie'
@@ -110,7 +133,7 @@ export const PROVIDERS: Provider[] = [
 	},
 	{
 		id: 'vidfast',
-		label: 'Server 3 · VidFast · 有廣告 Ads',
+		label: 'Server 4 · VidFast · 有廣告 Ads',
 		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie' ? `https://vidfast.pro/movie/${id}` : `https://vidfast.pro/tv/${id}/${season}/${episode}`,

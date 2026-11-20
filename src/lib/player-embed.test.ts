@@ -67,8 +67,8 @@ describe('provider embed iframe (Player.svelte)', () => {
 		}
 	});
 
-	it('defaults to the Demo Player, the only verified ad-free player', () => {
-		expect(source).toContain("$state('demo')");
+	it('defaults to EmbedWave, verified sandbox-clean in a real-browser harness (2026-11-20)', () => {
+		expect(source).toContain("$state('embedwave')");
 	});
 
 	it('grants the playback permissions embeds need', () => {

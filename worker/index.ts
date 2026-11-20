@@ -194,8 +194,20 @@ interface ServerProvider {
 
 export const SERVER_PROVIDERS: ServerProvider[] = [
 	{
+		id: 'embedwave',
+		label: 'Server 1 · EmbedWave',
+		capabilities: ['stream'],
+		progressEvents: false,
+		verified: true,
+		host: 'embedwave.cc',
+		build: ({ id, type, season, episode }) =>
+			type === 'movie'
+				? `https://embedwave.cc/embed/movie/${id}`
+				: `https://embedwave.cc/embed/tv/${id}/${season}/${episode}`
+	},
+	{
 		id: 'demo',
-		label: 'Server 1 · Demo Player',
+		label: 'Server 2 · Demo Player',
 		capabilities: ['stream'],
 		progressEvents: false,
 		verified: true,
@@ -204,7 +216,7 @@ export const SERVER_PROVIDERS: ServerProvider[] = [
 	},
 	{
 		id: 'vidlink',
-		label: 'Server 2 · VidLink · ads when unsandboxed',
+		label: 'Server 3 · VidLink · 有廣告 Ads',
 		capabilities: ['stream'],
 		progressEvents: true,
 		verified: true,
@@ -216,7 +228,7 @@ export const SERVER_PROVIDERS: ServerProvider[] = [
 	},
 	{
 		id: 'vidfast',
-		label: 'Server 3 · VidFast · ads when unsandboxed',
+		label: 'Server 4 · VidFast · 有廣告 Ads',
 		capabilities: ['stream'],
 		progressEvents: false,
 		verified: true,
@@ -330,7 +342,7 @@ export async function handleRequest(req: Request, env: Env, now = Date.now(), de
 	 * The payload is a pure function of anonymous params, so the whole PoP
 	 * shares one entry and repeat plays cost zero compute. */
 	if (req.method === 'GET' && path === '/resolve') {
-		const provider = url.searchParams.get('provider') ?? 'demo';
+		const provider = url.searchParams.get('provider') ?? 'embedwave';
 		const typeRaw = url.searchParams.get('type') ?? 'movie';
 		const id = Number(url.searchParams.get('id'));
 		const season = Math.max(1, Number(url.searchParams.get('season') ?? 1) || 1);
