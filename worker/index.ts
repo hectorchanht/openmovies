@@ -206,8 +206,22 @@ export const SERVER_PROVIDERS: ServerProvider[] = [
 				: `https://embedwave.cc/embed/tv/${id}/${season}/${episode}`
 	},
 	{
+		id: 'bingeapi',
+		label: 'Server 2 · BingeAPI · 12 servers auto-switch',
+		capabilities: ['stream'],
+		progressEvents: false,
+		// Not yet verified sandbox-clean on a real device (2026-11-24):
+		// datacenter probes get a Turnstile check page. Mirrors the client.
+		verified: false,
+		host: 'bingeapi.st',
+		build: ({ id, type, season, episode }) =>
+			type === 'movie'
+				? `https://bingeapi.st/embed/movie/${id}`
+				: `https://bingeapi.st/embed/tv/${id}/${season}/${episode}`
+	},
+	{
 		id: 'demo',
-		label: 'Server 2 · Demo Player',
+		label: 'Server 3 · Demo Player',
 		capabilities: ['stream'],
 		progressEvents: false,
 		verified: true,
@@ -216,7 +230,7 @@ export const SERVER_PROVIDERS: ServerProvider[] = [
 	},
 	{
 		id: 'vidlink',
-		label: 'Server 3 · VidLink · 有廣告 Ads',
+		label: 'Server 4 · VidLink · 有廣告 Ads',
 		capabilities: ['stream'],
 		progressEvents: true,
 		verified: true,
@@ -228,13 +242,14 @@ export const SERVER_PROVIDERS: ServerProvider[] = [
 	},
 	{
 		id: 'vidfast',
-		label: 'Server 4 · VidFast · 有廣告 Ads',
+		label: 'Server 5 · VidFast · 有廣告 Ads',
 		capabilities: ['stream'],
 		progressEvents: false,
 		verified: true,
-		host: 'vidfast.pro',
+		// Domain moved .pro -> .vc (2026-11-24; .pro survives only as a 301).
+		host: 'vidfast.vc',
 		build: ({ id, type, season, episode }) =>
-			type === 'movie' ? `https://vidfast.pro/movie/${id}` : `https://vidfast.pro/tv/${id}/${season}/${episode}`
+			type === 'movie' ? `https://vidfast.vc/movie/${id}` : `https://vidfast.vc/tv/${id}/${season}/${episode}`
 	}
 ];
 

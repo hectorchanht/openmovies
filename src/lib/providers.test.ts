@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { PROVIDERS, downloadOptions, parseProgressMessage, providerById, providerMarker } from './providers';
+import {
+	FAILOVER_TIMEOUT_MS,
+	PROVIDERS,
+	downloadOptions,
+	failoverRotation,
+	nextFailoverProvider,
+	parseProgressMessage,
+	providerById,
+	providerMarker
+} from './providers';
 
 describe('provider registry', () => {
 	it('builds VidLink movie and tv URLs from TMDB ids', () => {
@@ -18,21 +27,43 @@ describe('provider registry', () => {
 			'https://embedwave.cc/embed/tv/1396/2/3'
 		);
 	});
-	it('builds VidFast URLs from TMDB ids', () => {
-		expect(providerById('vidfast').build({ id: 155, type: 'movie' })).toBe('https://vidfast.pro/movie/155');
+	it('builds VidFast URLs from TMDB ids on the moved .vc domain (2026-11-24)', () => {
+		expect(providerById('vidfast').build({ id: 155, type: 'movie' })).toBe('https://vidfast.vc/movie/155');
 		expect(providerById('vidfast').build({ id: 1396, type: 'tv', season: 1, episode: 2 })).toBe(
-			'https://vidfast.pro/tv/1396/1/2'
+			'https://vidfast.vc/tv/1396/1/2'
+		);
+		for (const p of PROVIDERS) {
+			expect(p.build({ id: 1, type: 'movie' })).not.toContain('vidfast.pro');
+		}
+	});
+	it('builds BingeAPI URLs from TMDB ids (bingeapi.st embed patterns)', () => {
+		expect(providerById('bingeapi').build({ id: 577922, type: 'movie' })).toBe(
+			'https://bingeapi.st/embed/movie/577922'
+		);
+		expect(providerById('bingeapi').build({ id: 1396, type: 'tv', season: 2, episode: 3 })).toBe(
+			'https://bingeapi.st/embed/tv/1396/2/3'
 		);
 	});
-	it('has EmbedWave FIRST as Server 1 (verified sandbox-clean default, 2026-11-20), demo second', () => {
-		expect(PROVIDERS.length).toBeGreaterThanOrEqual(4);
+	it('has EmbedWave FIRST as Server 1 (verified sandbox-clean default, 2026-11-20), BingeAPI second (2026-11-24)', () => {
+		expect(PROVIDERS.length).toBeGreaterThanOrEqual(5);
 		expect(PROVIDERS[0].id).toBe('embedwave');
 		expect(PROVIDERS[0].label).toContain('Server 1');
 		expect(PROVIDERS[0].label).toContain('EmbedWave');
-		expect(PROVIDERS[1].id).toBe('demo');
+		expect(PROVIDERS[1].id).toBe('bingeapi');
 		expect(PROVIDERS[1].label).toContain('Server 2');
-		expect(providerById('vidlink').label).toContain('Server 3');
-		expect(providerById('vidfast').label).toContain('Server 4');
+		expect(providerById('demo').label).toContain('Server 3');
+		expect(providerById('vidlink').label).toContain('Server 4');
+		expect(providerById('vidfast').label).toContain('Server 5');
+	});
+	it('BingeAPI is honestly labelled: auto-switch claim on the chip, NOT verified, never ad-tagged', () => {
+		const p = providerById('bingeapi');
+		expect(p.label).toContain('BingeAPI');
+		expect(p.label).toContain('12 servers auto-switch');
+		expect(p.label).not.toContain('有廣告');
+		expect(p.verified).toBe(false);
+		expect(p.adSupported).toBe(false);
+		// unverified => the chip marker says so (never "down", never silent)
+		expect(providerMarker(p, [])).toBe(' · unverified');
 	});
 	it('ad-funded providers carry the 有廣告 tag on their chip label and an honest note', () => {
 		for (const id of ['vidlink', 'vidfast']) {
@@ -55,6 +86,7 @@ describe('provider registry', () => {
 		expect(providerById('vidfast').adSupported).toBe(true);
 		expect(providerById('demo').adSupported).toBe(false);
 		expect(providerById('embedwave').adSupported).toBe(false);
+		expect(providerById('bingeapi').adSupported).toBe(false);
 	});
 	it('never points at the dead VidSrc / VidKing hosts (removed 2026-11-18, both NXDOMAIN)', () => {
 		for (const p of PROVIDERS) {
@@ -83,6 +115,38 @@ describe('VidLink progress events', () => {
 		expect(parseProgressMessage({ type: 'OTHER', data: { currentTime: 1, duration: 2 } })).toBeNull();
 		expect(parseProgressMessage({ type: 'PLAYER_EVENT', data: { currentTime: 1, duration: 0 } })).toBeNull();
 		expect(parseProgressMessage({ type: 'PLAYER_EVENT', data: { currentTime: '1', duration: 2 } })).toBeNull();
+	});
+});
+
+describe('automatic failover rotation (2026-11-24)', () => {
+	it('has a bounded, generous timeout', () => {
+		expect(FAILOVER_TIMEOUT_MS).toBeGreaterThanOrEqual(10_000);
+		expect(FAILOVER_TIMEOUT_MS).toBeLessThanOrEqual(30_000);
+	});
+	it('never auto-advances into the simulated Demo Player', () => {
+		expect(failoverRotation(false).map((p) => p.id)).not.toContain('demo');
+		expect(failoverRotation(true).map((p) => p.id)).not.toContain('demo');
+	});
+	it('keeps ad-supported servers OUT of the rotation until Ad Mode is on (consent)', () => {
+		expect(failoverRotation(false).map((p) => p.id)).toEqual(['embedwave', 'bingeapi']);
+		expect(failoverRotation(true).map((p) => p.id)).toEqual(['embedwave', 'bingeapi', 'vidlink', 'vidfast']);
+	});
+	it('advances in registry order from the current server', () => {
+		expect(nextFailoverProvider('embedwave', [], { adMode: false })?.id).toBe('bingeapi');
+		expect(nextFailoverProvider('embedwave', [], { adMode: true })?.id).toBe('bingeapi');
+		expect(nextFailoverProvider('bingeapi', [], { adMode: true })?.id).toBe('vidlink');
+	});
+	it('skips servers already tried and never returns the current one', () => {
+		expect(nextFailoverProvider('embedwave', ['bingeapi'], { adMode: true })?.id).toBe('vidlink');
+		expect(nextFailoverProvider('vidlink', ['embedwave', 'bingeapi'], { adMode: true })?.id).toBe('vidfast');
+	});
+	it('wraps once, then gives up (null) when everything was tried', () => {
+		expect(nextFailoverProvider('vidfast', [], { adMode: true })?.id).toBe('embedwave');
+		expect(nextFailoverProvider('embedwave', ['bingeapi'], { adMode: false })).toBeNull();
+		expect(nextFailoverProvider('vidfast', ['embedwave', 'bingeapi', 'vidlink'], { adMode: true })).toBeNull();
+	});
+	it('with Ad Mode off, exhausting the clean servers ends the chain (no silent ad opt-in)', () => {
+		expect(nextFailoverProvider('bingeapi', ['embedwave'], { adMode: false })).toBeNull();
 	});
 });
 

@@ -81,6 +81,47 @@ describe('provider embed iframe (Player.svelte)', () => {
 	});
 });
 
+describe('automatic failover (Player.svelte, 2026-11-24)', () => {
+	it('arms a device-side liveness timer for each fresh embed URL', () => {
+		expect(source).toContain('FAILOVER_TIMEOUT_MS');
+		expect(source).toContain('setTimeout(onFailoverTimeout, FAILOVER_TIMEOUT_MS)');
+		expect(source).toContain('armFailover()');
+	});
+	it('treats a load event on the embed frame as a sign of life', () => {
+		expect(iframeTag).toContain('onload={onFrameLoad}');
+		expect(source).toContain('function onFrameLoad()');
+	});
+	it('treats any postMessage from the embed origin as a sign of life', () => {
+		expect(source).toContain('markSignalled();');
+	});
+	it('advances through the providers.ts rotation and announces the switch', () => {
+		expect(source).toContain('nextFailoverProvider(providerId, triedIds, { adMode })');
+		expect(source).toContain("didn't respond — switched to");
+		expect(source).toContain('已自動切換至');
+		expect(source).toContain('failoverNote');
+	});
+	it('manual switching resets the rotation (the user takes over)', () => {
+		expect(source).toContain('if (!failoverJump) {');
+	});
+	it('never arms failover for the simulated Demo Player or unreleased titles', () => {
+		expect(source).toContain("if (unreleased || providerId === 'demo' || !src) return;");
+	});
+});
+
+describe('unreleased titles (Player.svelte, 2026-11-24)', () => {
+	it('derives the state from the TMDB release date', () => {
+		expect(source).toContain('isUnreleased(title.releaseDate)');
+	});
+	it('shows the bilingual honesty state instead of dead server chips', () => {
+		expect(source).toContain('{#if unreleased}');
+		expect(source).toContain('Not yet released — no sources exist yet · 未上映，未有片源');
+		expect(source).toContain('Expected release · 預計上映：{title.releaseDate}');
+	});
+	it('does not resolve any embed for an unreleased title', () => {
+		expect(source).toContain('if (unreleased) {');
+	});
+});
+
 describe('Ad Mode (Player.svelte)', () => {
 	it('defaults OFF and persists per device under the om_ad_mode key', () => {
 		expect(source).toContain('let adMode = $state(false)');

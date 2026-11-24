@@ -3,7 +3,7 @@ import {
 	continueWatching, loadPersonal, markWatched, parsePersonal, savePersonal,
 	toggleLiked, toggleWatchlist, upsertResume
 } from './personal';
-import { achievementsFor, emptyPersonal } from './types';
+import { achievementsFor, emptyPersonal, isUnreleased } from './types';
 
 const entry = (over = {}) => ({
 	titleId: 27205, type: 'movie' as const, positionSec: 1800, durationSec: 5400, updatedAt: 1000, ...over
@@ -55,6 +55,25 @@ describe('personal layer', () => {
 		expect(s.liked).toEqual([1, 2]);
 		expect(Object.keys(s.resume)).toHaveLength(0);
 		expect(s.flags.serverSwitched).toBe(false);
+	});
+});
+
+describe('unreleased titles (2026-11-24)', () => {
+	const now = new Date(2026, 10, 24); // 2026-11-24 local
+	it('a future release date is unreleased (the Avengers: Doomsday case)', () => {
+		expect(isUnreleased('2026-12-18', now)).toBe(true);
+		expect(isUnreleased('2027-01-01', now)).toBe(true);
+	});
+	it('past and same-day releases count as released', () => {
+		expect(isUnreleased('2020-08-26', now)).toBe(false); // Tenet
+		expect(isUnreleased('2026-11-24', now)).toBe(false);
+		expect(isUnreleased('2026-11-23', now)).toBe(false);
+	});
+	it('missing or malformed dates never block a title', () => {
+		expect(isUnreleased(undefined, now)).toBe(false);
+		expect(isUnreleased('', now)).toBe(false);
+		expect(isUnreleased('2026', now)).toBe(false);
+		expect(isUnreleased('not-a-date', now)).toBe(false);
 	});
 });
 

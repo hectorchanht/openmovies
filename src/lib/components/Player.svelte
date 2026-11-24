@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { PROVIDERS, parseProgressMessage, providerById, providerMarker } from '$lib/providers';
+	import { FAILOVER_TIMEOUT_MS, PROVIDERS, nextFailoverProvider, parseProgressMessage, providerById, providerMarker } from '$lib/providers';
 	import { BUILTIN_TRACKS, searchSubtitles, type SubtitleTrack } from '$lib/subtitles';
 	import { resolveSource } from '$lib/resolve';
 	import { fetchProviderHealth } from '$lib/api';
 	import { store } from '$lib/store.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import { resumeKey } from '$lib/types';
+	import { isUnreleased, resumeKey } from '$lib/types';
 	import type { Title } from '$lib/types';
 
 	let { title, season = 1, episode = 1 }: { title: Title; season?: number; episode?: number } = $props();
@@ -14,10 +14,17 @@
 	// Default is EmbedWave (2026-11-20): verified in a real-browser
 	// harness to play inside the exact P0 sandbox with no popup, no
 	// redirect and no sandbox refusal — the first real provider that
-	// satisfies the sandbox contract. The Demo Player is the simulated
-	// fallback (Server 2). Ad-supported servers are opt-in via their
-	// 有廣告 tag unless the user opens Ad Mode (see the iframe below).
+	// satisfies the sandbox contract. BingeAPI (Server 2, 2026-11-24) is
+	// the next real server; the Demo Player is the simulated fallback
+	// (Server 3). Ad-supported servers are opt-in via their 有廣告 tag
+	// unless the user opens Ad Mode (see the embed below).
 	let providerId = $state('embedwave');
+	// Unreleased titles (TMDB release date still in the future) have no
+	// source ANYWHERE — no provider can play what does not exist yet.
+	// The player renders an honesty state for them instead of a row of
+	// dead server chips (2026-11-24: Hector hit exactly this on an
+	// unreleased film and every server "failed"). See the markup below.
+	const unreleased = $derived(isUnreleased(title.releaseDate));
 	// Ad Mode (Hector ruling 2026-11-20, lightest form): the disclosure
 	// is the 有廣告 · Ads tag on the provider chip itself. A user who
 	// taps a tagged provider has knowingly opted in — that tap IS the
@@ -55,10 +62,22 @@
 	let src = $state('');
 	$effect(() => {
 		const pid = providerId;
+		if (unreleased) {
+			src = '';
+			return;
+		}
 		const target = { id: title.id, type: title.type, season, episode };
 		const stamp = `${pid}:${target.id}:${target.type}:${season}:${episode}`;
 		void resolveSource(pid, target).then((r) => {
-			if (`${providerId}:${title.id}:${title.type}:${season}:${episode}` === stamp) src = r.embedUrl;
+			if (`${providerId}:${title.id}:${title.type}:${season}:${episode}` !== stamp) return;
+			let url = r.embedUrl;
+			// VidLink accepts a startAt hint: when the viewer's place is
+			// already known (its own progress events feed `pos`), carry
+			// it across a server switch instead of restarting the title.
+			if (pid === 'vidlink' && pos > 5 && !url.includes('startAt')) {
+				url += `${url.includes('?') ? '&' : '?'}startAt=${Math.floor(pos)}`;
+			}
+			src = url;
 		});
 	});
 	// Providers the Worker's EDGE health probe could not confirm. The
@@ -78,6 +97,68 @@
 		store.recordResume({ titleId: title.id, type: title.type, season: title.type === 'tv' ? season : undefined, episode: title.type === 'tv' ? episode : undefined, positionSec: Math.floor(positionSec), durationSec: Math.floor(durationSec), updatedAt: now });
 	}
 
+	// Automatic failover (2026-11-24, Hector directive — "instant,
+	// ad-free, like bingebang.sx"; FMHY grading criterion: automatic
+	// source-switching). This reverses the 2026-11-20 no-failover
+	// stance for DEVICE-SIDE signals only: the old objection was that
+	// the edge probe's vantage says nothing about the user's device —
+	// so the probe still never causes a skip (see onMount). Here the
+	// signal is the device's own experience: a freshly loaded embed
+	// that gives no sign of life — no load event on the embed frame,
+	// no postMessage from its origin — within FAILOVER_TIMEOUT_MS is
+	// presumed dead ON THIS DEVICE, and the player advances to the
+	// next server in the rotation (providers.nextFailoverProvider:
+	// never into the simulated Demo Player, never into an ad-supported
+	// server unless Ad Mode is already on) and says so in a note —
+	// honesty, not silence. Manual switching stays and resets the
+	// rotation. Cross-origin embeds cannot be read, so a shell page
+	// that loads but finds no source still counts as "alive" — that
+	// residual is Wave 2's server-side per-title resolution.
+	let failoverNote = $state('');
+	let triedIds = $state<string[]>([]);
+	let failoverTimer: ReturnType<typeof setTimeout> | undefined;
+	let failoverJump = false;
+
+	function clearFailoverTimer() {
+		if (failoverTimer !== undefined) {
+			clearTimeout(failoverTimer);
+			failoverTimer = undefined;
+		}
+	}
+	function markSignalled() {
+		clearFailoverTimer();
+	}
+	function onFrameLoad() {
+		markSignalled();
+	}
+	function armFailover() {
+		clearFailoverTimer();
+		if (unreleased || providerId === 'demo' || !src) return;
+		failoverTimer = setTimeout(onFailoverTimeout, FAILOVER_TIMEOUT_MS);
+	}
+	function onFailoverTimeout() {
+		failoverTimer = undefined;
+		const from = currentProvider;
+		const next = nextFailoverProvider(providerId, triedIds, { adMode });
+		if (!next) {
+			failoverNote = 'No server responded — try switching manually · 所有伺服器都無回應，可以手動切換其他 Server 試下。';
+			return;
+		}
+		triedIds = [...triedIds, providerId];
+		failoverNote = `${from.label} didn't respond — switched to ${next.label} · ${from.label} 無回應，已自動切換至 ${next.label}。`;
+		failoverJump = true;
+		switchTo(next.id);
+		failoverJump = false;
+	}
+
+	// (Re)arm the failover timer whenever a fresh embed URL lands.
+	$effect(() => {
+		void src;
+		void providerId;
+		armFailover();
+		return clearFailoverTimer;
+	});
+
 	function switchTo(id: string) {
 		if (id !== providerId) store.noteServerSwitch();
 		providerId = id;
@@ -85,6 +166,13 @@
 		// (sticky) so the tagged provider loads unsandboxed right away —
 		// one tap from "can't play" to playing, no separate enable step.
 		if (providerById(id).adSupported) setAdMode(true);
+		// A manual switch is the user taking over: reset the failover
+		// rotation and its note. Failover's own jumps (failoverJump)
+		// keep both, so the chain can continue and the note survives.
+		if (!failoverJump) {
+			triedIds = [];
+			failoverNote = '';
+		}
 	}
 
 	onMount(() => {
@@ -97,9 +185,12 @@
 		if (existing) pos = existing.positionSec;
 		void fetchProviderHealth().then((health) => {
 			if (!health) return;
-			// Deliberately NO failover here: an edge-probe failure is not
-			// evidence about this device's reachability, so the selected
-			// server never changes on probe data (see providerMarker).
+			// The edge probe NEVER causes a skip or a switch: a failed
+			// probe is not evidence about this device's reachability,
+			// so the selected server never changes on probe data (see
+			// providerMarker). Automatic failover (2026-11-24) is a
+			// separate mechanism driven only by this device's own
+			// embed experience — see armFailover / onFailoverTimeout.
 			unconfirmedIds = health.filter((p) => !p.ok).map((p) => p.id);
 		});
 		void searchSubtitles({ tmdbId: title.id, type: title.type, season, episode }).then((t) => (tracks = t));
@@ -108,6 +199,9 @@
 			try {
 				if (ev.origin !== new URL(frame.src).origin) return;
 			} catch { return; }
+			// Any message from the embed's own origin is a sign of life:
+			// the failover timer stands down (see armFailover).
+			markSignalled();
 			const s = parseProgressMessage(ev.data);
 			if (s) save(s.currentTime, s.duration);
 		};
@@ -119,12 +213,31 @@
 				if (pos >= duration) { playing = false; store.markWatched(title.id); }
 			}
 		}, 1000);
-		return () => { window.removeEventListener('message', onMsg); clearInterval(timer); };
+		return () => { window.removeEventListener('message', onMsg); clearInterval(timer); clearFailoverTimer(); };
 	});
 
 	const fmt = (s: number) => `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 </script>
 
+{#if unreleased}
+	<div class="player">
+		<div class="stage" style={`background:${title.art}`}>
+			{#if title.backdropPath}
+				<img class="backdrop" src={`https://image.tmdb.org/t/p/w500${title.backdropPath}`} alt="" aria-hidden="true" />
+			{/if}
+			<p class="stagename">{title.name}</p>
+			<p class="unreleased-badge">Not yet released — no sources exist yet · 未上映，未有片源</p>
+			<p class="small">Expected release · 預計上映：{title.releaseDate}</p>
+			{#if title.genres.length || title.rating > 0}
+				<p class="small muted">{title.year}{#if title.genres.length} · {title.genres.join(' · ')}{/if}{#if title.rating > 0} · ★ {title.rating.toFixed(1)}{/if}</p>
+			{/if}
+			{#if title.overview}
+				<p class="small muted overview">{title.overview}</p>
+			{/if}
+		</div>
+	</div>
+	<p class="small muted">This title has not been released yet, so no streaming server anywhere has it — the servers are not broken; the film simply does not exist to stream yet. Come back after the release date. 呢套戲仲未上映，全世界都未有片源 — 唔係 Server 壞咗，係套戲未出；出咗之後返嚟就睇到。</p>
+{:else}
 <div class="player">
 	{#if providerId === 'demo'}
 		<div class="stage" style={`background:${title.art}`}>
@@ -149,7 +262,7 @@
 		     state flips, because browsers apply sandbox flags only at
 		     navigation time. -->
 		{#key embedUnsandboxed}
-			<iframe bind:this={frame} title={`Player — ${title.name}`} src={src} sandbox={embedUnsandboxed ? undefined : 'allow-scripts allow-same-origin allow-presentation'} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
+			<iframe bind:this={frame} onload={onFrameLoad} title={`Player — ${title.name}`} src={src} sandbox={embedUnsandboxed ? undefined : 'allow-scripts allow-same-origin allow-presentation'} allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>
 		{/key}
 	{:else}
 		<div class="stage"><p class="muted small">Loading server…</p></div>
@@ -169,12 +282,16 @@
 		</select>
 	</label>
 </div>
+{#if failoverNote}
+	<p class="small failover" role="status">{failoverNote}</p>
+{/if}
 {#if currentProvider.adSupported}
 	<p class="small muted">呢個 Server 有廣告：撳 Play 時可能彈廣告，撳一次交叉（X）閂咗佢就得。我哋唔會從呢啲廣告賺錢 — 廣告係 provider 強制顯示，同我哋無關。This server carries ads: a pop-up may appear when you press play — close it once (tap X). We earn nothing from these ads — the provider forces them; they are not ours.</p>
 {:else if currentProvider.note}
 	<p class="small muted">{currentProvider.note}</p>
 {/if}
-<p class="small muted">If a server is slow or down, switch servers — your place is kept. Third-party servers run sandboxed by default, so they can never redirect this tab or open pop-up ads; a server tagged 有廣告 runs unsandboxed only when you select it — that selection is your opt-in. Progress in the Demo Player is saved automatically; other servers keep their own resume.</p>
+<p class="small muted">If a server doesn't respond, the player switches to the next one automatically — or switch servers yourself; your place is kept. Third-party servers run sandboxed by default, so they can never redirect this tab or open pop-up ads; a server tagged 有廣告 runs unsandboxed only when you select it — that selection is your opt-in. Progress in the Demo Player is saved automatically; other servers keep their own resume.</p>
+{/if}
 
 <style>
 	.player { position: relative; aspect-ratio: 16/9; background: #000; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }
@@ -188,4 +305,9 @@
 	.subs { display: inline-flex; align-items: center; gap: 6px; }
 	.subs select { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 	.admode { display: inline-flex; align-items: center; gap: 6px; }
+	.backdrop { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.45; }
+	.stage > :not(.backdrop) { position: relative; }
+	.unreleased-badge { font-weight: 700; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); margin: 0; }
+	.overview { max-width: 560px; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+	.failover { color: var(--accent); }
 </style>
