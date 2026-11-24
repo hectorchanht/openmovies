@@ -28,6 +28,10 @@ button { font: inherit; cursor: pointer; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn:active { transform: scale(0.98); }
+/* Icon-only controls (icon sweep 2026-11-23): fixed geometry — the icon never stretches the control. */
+.btn.ico { width: 44px; height: 44px; padding: 0; justify-content: center; flex: none; }
+.btn.ico.big { width: 56px; height: 56px; border-radius: 999px; }
+.chip.ico { width: 36px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex: none; }
 
 .chip {
 	display: inline-block; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);

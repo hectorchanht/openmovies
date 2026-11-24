@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { requestCode, verifyCode, apiConfigured } from '$lib/api';
 	import { store } from '$lib/store.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 
 	let email = $state('');
 	let code = $state('');
@@ -41,13 +42,13 @@
 	<div class="panel verdict-official">
 		<strong>You're in{store.session?.email ? ` as ${store.session.email}` : ''}.</strong>
 		<p class="small muted">Your lists follow you — across devices, and across domains if OpenMovies ever has to move home.</p>
-		<a class="btn primary" href="/my">Go to My List</a>
+		<a class="btn primary ico" href="/my" aria-label="Go to My List" title="Go to My List"><Icon name="bookmark" /></a>
 	</div>
 {:else if stage === 'code'}
 	<div class="panel">
 		<p>{msg}</p>
 		<input type="text" inputmode="numeric" placeholder="6-digit code" bind:value={code} aria-label="6-digit code" />
-		<button class="btn primary" onclick={verify} disabled={code.trim().length !== 6}>Verify &amp; sign in</button>
+		<button class="btn primary ico" onclick={verify} disabled={code.trim().length !== 6} aria-label="Verify and sign in" title="Verify and sign in"><Icon name="login" /></button>
 		{#if msg && stage === 'code' && code}<p class="small" style="color:var(--bad)">{msg}</p>{/if}
 	</div>
 {:else}
@@ -55,11 +56,11 @@
 		<label class="small muted">Email
 			<input type="email" placeholder="you@example.com" bind:value={email} />
 		</label>
-		<button class="btn primary" onclick={send} disabled={!email.includes('@')}>Email me a sign-in code</button>
+		<button class="btn primary ico" onclick={send} disabled={!email.includes('@')} aria-label="Email me a sign-in code" title="Email me a sign-in code"><Icon name="mail" /></button>
 		{#if msg}<p class="small muted">{msg}</p>{/if}
 		{#if stage === 'local'}
 			<hr />
-			<button class="btn" onclick={localProfile}>Continue with an on-device profile instead</button>
+			<button class="btn ico" onclick={localProfile} aria-label="Continue with an on-device profile instead" title="Continue with an on-device profile instead"><Icon name="smartphone" /></button>
 			<p class="small muted">On-device profiles keep your lists on this browser only, under the name above. {apiConfigured() ? '' : ''}</p>
 		{/if}
 	</div>

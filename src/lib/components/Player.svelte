@@ -5,6 +5,7 @@
 	import { resolveSource } from '$lib/resolve';
 	import { fetchProviderHealth } from '$lib/api';
 	import { store } from '$lib/store.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 	import { resumeKey } from '$lib/types';
 	import type { Title } from '$lib/types';
 
@@ -129,7 +130,7 @@
 		<div class="stage" style={`background:${title.art}`}>
 			<p class="stagename">{title.name}</p>
 			<p class="muted small">Demo player — simulated playback so resume, Continue Watching and achievements work end-to-end without any third-party server.</p>
-			<button class="btn primary big" onclick={() => (playing = !playing)}>{playing ? 'Pause' : pos > 5 ? `Resume from ${fmt(pos)}` : 'Play'}</button>
+			<button class="btn primary big ico" onclick={() => (playing = !playing)} aria-label={playing ? 'Pause' : pos > 5 ? `Resume from ${fmt(pos)}` : 'Play'} title={playing ? 'Pause' : pos > 5 ? `Resume from ${fmt(pos)}` : 'Play'}><Icon name={playing ? 'pause' : 'play'} big /></button>{#if !playing && pos > 5}<span class="small muted">{fmt(pos)}</span>{/if}
 			<input class="seek" type="range" min="0" max={duration} value={pos} oninput={(e) => { pos = Number((e.currentTarget as HTMLInputElement).value); save(pos, duration); }} aria-label="Seek" />
 			<p class="small muted">{fmt(pos)} / {fmt(duration)}</p>
 		</div>
@@ -161,9 +162,9 @@
 			<button class="chip" class:on={providerId === p.id} onclick={() => switchTo(p.id)}>{p.label}{providerMarker(p, unconfirmedIds)}</button>
 		{/each}
 	</div>
-	<button class="chip" class:on={adMode} onclick={() => setAdMode(!adMode)} aria-pressed={adMode}>廣告模式 Ad Mode · {adMode ? 'ON' : 'OFF'}</button>
-	<label class="subs small muted">Subtitles
-		<select bind:value={track}>
+	<button class="chip admode" class:on={adMode} onclick={() => setAdMode(!adMode)} aria-pressed={adMode} aria-label="廣告模式 Ad Mode" title="廣告模式 Ad Mode"><Icon name="megaphone" /><span>{adMode ? 'ON' : 'OFF'}</span></button>
+	<label class="subs small muted"><Icon name="cc" />
+		<select bind:value={track} aria-label="Subtitles">
 			{#each tracks as t}<option value={t.lang}>{t.label}</option>{/each}
 		</select>
 	</label>
@@ -184,5 +185,7 @@
 	.seek { width: min(520px, 90%); accent-color: var(--accent); }
 	.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-top: 12px; }
 	.servers { display: flex; flex-wrap: wrap; gap: 8px; }
-	.subs select { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin-left: 6px; }
+	.subs { display: inline-flex; align-items: center; gap: 6px; }
+	.subs select { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+	.admode { display: inline-flex; align-items: center; gap: 6px; }
 </style>

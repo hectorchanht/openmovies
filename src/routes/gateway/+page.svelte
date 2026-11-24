@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { checkDomain, FAKE_WARNINGS, OFFICIAL_HOMES } from '$lib/checker';
+	import Icon from '$lib/components/Icon.svelte';
 
 	let input = $state('');
 	const verdict = $derived(input.trim() ? checkDomain(input) : null);
@@ -14,8 +15,8 @@
 <div class="panel verdict-official">
 	<span class="pill">Current official home</span>
 	<p class="home">{OFFICIAL_HOMES[0]}</p>
-	<a class="btn primary" href="/">Enter OpenMovies</a>
-	<button class="btn" onclick={() => navigator.clipboard?.writeText(`https://${OFFICIAL_HOMES[0]}`)}>Copy address</button>
+	<a class="btn primary ico" href="/" aria-label="Enter OpenMovies" title="Enter OpenMovies"><Icon name="home" /></a>
+	<button class="btn ico" onclick={() => navigator.clipboard?.writeText(`https://${OFFICIAL_HOMES[0]}`)} aria-label="Copy address" title="Copy address"><Icon name="copy" /></button>
 </div>
 
 <h2>Check a domain</h2>
