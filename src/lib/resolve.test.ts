@@ -71,14 +71,14 @@ describe('resolveSource', () => {
 			{ id: 1396, type: 'tv', season: 2, episode: 3 },
 			{ apiBase: 'https://api.test', fetchFn, now: NOW, storage: new FakeStorage() }
 		);
-		expect(r.embedUrl).toBe('https://vidfast.vc/tv/1396/2/3');
+		expect(r.embedUrl).toBe('https://vidfast.pro/tv/1396/2/3');
 		expect(r.downloadUrl).toBeNull();
 	});
 
 	it('with no API configured, resolves locally with zero fetches', async () => {
 		const fetchFn = vi.fn() as unknown as typeof fetch;
 		const r = await resolveSource('vidfast', { id: 603, type: 'movie' }, { apiBase: '', fetchFn, now: NOW, storage: new FakeStorage() });
-		expect(r.embedUrl).toContain('vidfast.vc/movie/603');
+		expect(r.embedUrl).toContain('vidfast.pro/movie/603');
 		expect(fetchFn).not.toHaveBeenCalled();
 	});
 });

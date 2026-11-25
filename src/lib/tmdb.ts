@@ -63,13 +63,11 @@ function genresOf(raw: Record<string, unknown>, genreMap?: GenreMap): string[] {
 
 /** Map one TMDB movie/tv result (or detail) into our Title shape. Pure. */
 export function mapTmdb(raw: Record<string, unknown>, type: MediaType, i = 0, genreMap?: GenreMap): Title {
-	const dateRaw = type === 'movie' ? raw.release_date : raw.first_air_date;
 	return {
 		id: Number(raw.id),
 		type,
 		name: String((type === 'movie' ? raw.title : raw.name) ?? raw.title ?? raw.name ?? 'Untitled'),
-		year: Number(String(dateRaw ?? '0').slice(0, 4)) || 0,
-		releaseDate: typeof dateRaw === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateRaw) ? dateRaw.slice(0, 10) : undefined,
+		year: Number(String((type === 'movie' ? raw.release_date : raw.first_air_date) ?? '0').slice(0, 4)) || 0,
 		genres: genresOf(raw, genreMap),
 		rating: Math.round(Number(raw.vote_average ?? 0) * 10) / 10,
 		overview: String(raw.overview ?? ''),

@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import PosterCard from '$lib/components/PosterCard.svelte';
-	import Icon from '$lib/components/Icon.svelte';
 	import { TmdbCatalog } from '$lib/tmdb';
 	import { downloadOptions } from '$lib/providers';
 	import { trackEvent } from '$lib/api';
@@ -48,11 +47,11 @@
 			<p class="muted">{title.year} · ★ {title.rating.toFixed(1)} · {title.genres.join(' · ')}</p>
 			<p class="ov">{title.overview}</p>
 			<div class="btns">
-				<a class="btn primary ico" href={`/watch/${title.id}?type=${title.type}`} aria-label="Play" title="Play"><Icon name="play" /></a>
-				<button class="btn ico" class:on={liked} onclick={() => title && store.toggleLiked(title.id)} aria-label={liked ? 'Liked' : 'Like'} title={liked ? 'Liked' : 'Like'} aria-pressed={liked}><Icon name="heart" filled={liked} /></button>
-				<button class="btn ico" class:on={listed} onclick={() => title && store.toggleWatchlist(title.id)} aria-label={listed ? 'In My List' : 'Add to My List'} title={listed ? 'In My List' : 'Add to My List'} aria-pressed={listed}><Icon name={listed ? 'check' : 'bookmark'} /></button>
+				<a class="btn primary" href={`/watch/${title.id}?type=${title.type}`}>▶ Play</a>
+				<button class="btn" class:on={liked} onclick={() => title && store.toggleLiked(title.id)}>{liked ? '♥ Liked' : '♡ Like'}</button>
+				<button class="btn" class:on={listed} onclick={() => title && store.toggleWatchlist(title.id)}>{listed ? '✓ In My List' : '+ My List'}</button>
 				{#if downloads.length}
-					<button class="btn ico" onclick={startDownload} aria-label="Download · free" title="Download · free"><Icon name="download" /></button>
+					<button class="btn" onclick={startDownload}>⬇ Download · free</button>
 				{/if}
 				{#if watched}<span class="chip on">✓ Watched</span>{/if}
 			</div>
@@ -66,7 +65,7 @@
 				<a class="panel ep" href={`/watch/${title.id}?type=tv&s=${ep.season}&e=${ep.episode}`}>
 					<strong>S{ep.season} E{ep.episode} · {ep.title}</strong>
 					<span class="muted small">{ep.runtimeMin} min</span>
-					<span class="btn primary play ico-ep"><Icon name="play" /></span>
+					<span class="btn primary play">Play</span>
 				</a>
 			{/each}
 		</div>
@@ -88,5 +87,5 @@
 	.btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: center; }
 	.eps { display: grid; gap: 10px; }
 	.ep { display: flex; align-items: center; gap: 12px; }
-	.ep .play { margin-left: auto; width: 36px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+	.ep .play { margin-left: auto; padding: 7px 14px; font-size: 13px; }
 </style>

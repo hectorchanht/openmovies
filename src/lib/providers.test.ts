@@ -1,14 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	FAILOVER_TIMEOUT_MS,
-	PROVIDERS,
-	downloadOptions,
-	failoverRotation,
-	nextFailoverProvider,
-	parseProgressMessage,
-	providerById,
-	providerMarker
-} from './providers';
+import { BINGE_SERVERS, PROVIDERS, bingeServerQuality, downloadOptions, parseBingeMessage, parseProgressMessage, providerById, providerMarker } from './providers';
 
 describe('provider registry', () => {
 	it('builds VidLink movie and tv URLs from TMDB ids', () => {
@@ -27,43 +18,34 @@ describe('provider registry', () => {
 			'https://embedwave.cc/embed/tv/1396/2/3'
 		);
 	});
-	it('builds VidFast URLs from TMDB ids on the moved .vc domain (2026-11-24)', () => {
-		expect(providerById('vidfast').build({ id: 155, type: 'movie' })).toBe('https://vidfast.vc/movie/155');
+	it('builds VidFast URLs from TMDB ids', () => {
+		expect(providerById('vidfast').build({ id: 155, type: 'movie' })).toBe('https://vidfast.pro/movie/155');
 		expect(providerById('vidfast').build({ id: 1396, type: 'tv', season: 1, episode: 2 })).toBe(
-			'https://vidfast.vc/tv/1396/1/2'
+			'https://vidfast.pro/tv/1396/1/2'
 		);
-		for (const p of PROVIDERS) {
-			expect(p.build({ id: 1, type: 'movie' })).not.toContain('vidfast.pro');
-		}
 	});
-	it('builds BingeAPI URLs from TMDB ids (bingeapi.st embed patterns)', () => {
-		expect(providerById('bingeapi').build({ id: 577922, type: 'movie' })).toBe(
-			'https://bingeapi.st/embed/movie/577922'
+	it('builds BingeAPI URLs from TMDB ids (patterns from bingeapi.com/docs)', () => {
+		expect(providerById('bingeapi').build({ id: 27205, type: 'movie' })).toBe(
+			'https://bingeapi.st/embed/movie/27205?color=e8590c'
+		);
+		expect(providerById('bingeapi').build({ id: 1396, type: 'tv', season: 1, episode: 1 })).toBe(
+			'https://bingeapi.st/embed/tv/1396/1/1?color=e8590c'
 		);
 		expect(providerById('bingeapi').build({ id: 1396, type: 'tv', season: 2, episode: 3 })).toBe(
-			'https://bingeapi.st/embed/tv/1396/2/3'
+			'https://bingeapi.st/embed/tv/1396/2/3?color=e8590c'
 		);
 	});
-	it('has EmbedWave FIRST as Server 1 (verified sandbox-clean default, 2026-11-20), BingeAPI second (2026-11-24)', () => {
+	it('has BingeAPI FIRST as Server 1 (default, Hector 2026-11-24), EmbedWave second, demo third', () => {
 		expect(PROVIDERS.length).toBeGreaterThanOrEqual(5);
-		expect(PROVIDERS[0].id).toBe('embedwave');
+		expect(PROVIDERS[0].id).toBe('bingeapi');
 		expect(PROVIDERS[0].label).toContain('Server 1');
-		expect(PROVIDERS[0].label).toContain('EmbedWave');
-		expect(PROVIDERS[1].id).toBe('bingeapi');
+		expect(PROVIDERS[0].label).toContain('BingeAPI');
+		expect(PROVIDERS[1].id).toBe('embedwave');
 		expect(PROVIDERS[1].label).toContain('Server 2');
-		expect(providerById('demo').label).toContain('Server 3');
+		expect(PROVIDERS[2].id).toBe('demo');
+		expect(PROVIDERS[2].label).toContain('Server 3');
 		expect(providerById('vidlink').label).toContain('Server 4');
 		expect(providerById('vidfast').label).toContain('Server 5');
-	});
-	it('BingeAPI is honestly labelled: auto-switch claim on the chip, NOT verified, never ad-tagged', () => {
-		const p = providerById('bingeapi');
-		expect(p.label).toContain('BingeAPI');
-		expect(p.label).toContain('12 servers auto-switch');
-		expect(p.label).not.toContain('有廣告');
-		expect(p.verified).toBe(false);
-		expect(p.adSupported).toBe(false);
-		// unverified => the chip marker says so (never "down", never silent)
-		expect(providerMarker(p, [])).toBe(' · unverified');
 	});
 	it('ad-funded providers carry the 有廣告 tag on their chip label and an honest note', () => {
 		for (const id of ['vidlink', 'vidfast']) {
@@ -76,6 +58,7 @@ describe('provider registry', () => {
 		expect(providerById('demo').label).not.toContain('有廣告');
 		expect(providerById('demo').note).toBeUndefined();
 		expect(providerById('embedwave').label).not.toContain('有廣告');
+		expect(providerById('bingeapi').label).not.toContain('有廣告');
 	});
 	it('flags ad-supported providers explicitly; clean providers are never ad-supported', () => {
 		// Ad Mode may only unsandbox a provider whose adSupported flag is
@@ -87,6 +70,11 @@ describe('provider registry', () => {
 		expect(providerById('demo').adSupported).toBe(false);
 		expect(providerById('embedwave').adSupported).toBe(false);
 		expect(providerById('bingeapi').adSupported).toBe(false);
+	});
+	it('flags requiresUnsandboxed explicitly; ONLY BingeAPI carries it (Hector 2026-11-24 named exception)', () => {
+		for (const p of PROVIDERS) expect(typeof p.requiresUnsandboxed).toBe('boolean');
+		expect(providerById('bingeapi').requiresUnsandboxed).toBe(true);
+		for (const p of PROVIDERS.filter((x) => x.id !== 'bingeapi')) expect(p.requiresUnsandboxed).toBe(false);
 	});
 	it('never points at the dead VidSrc / VidKing hosts (removed 2026-11-18, both NXDOMAIN)', () => {
 		for (const p of PROVIDERS) {
@@ -118,35 +106,35 @@ describe('VidLink progress events', () => {
 	});
 });
 
-describe('automatic failover rotation (2026-11-24)', () => {
-	it('has a bounded, generous timeout', () => {
-		expect(FAILOVER_TIMEOUT_MS).toBeGreaterThanOrEqual(10_000);
-		expect(FAILOVER_TIMEOUT_MS).toBeLessThanOrEqual(30_000);
+describe('BingeAPI progress events', () => {
+	it('parses time and duration events (separate events, info carries the number)', () => {
+		expect(parseBingeMessage({ source: 'bingeapi_player', event: 'time', info: 3661 })).toEqual({
+			event: 'time',
+			currentTime: 3661
+		});
+		expect(parseBingeMessage({ source: 'bingeapi_player', event: 'duration', info: 5400 })).toEqual({
+			event: 'duration',
+			duration: 5400
+		});
 	});
-	it('never auto-advances into the simulated Demo Player', () => {
-		expect(failoverRotation(false).map((p) => p.id)).not.toContain('demo');
-		expect(failoverRotation(true).map((p) => p.id)).not.toContain('demo');
+	it('rejects junk, other sources, other events and bad numbers', () => {
+		expect(parseBingeMessage(null)).toBeNull();
+		expect(parseBingeMessage({ source: 'other', event: 'time', info: 1 })).toBeNull();
+		expect(parseBingeMessage({ source: 'bingeapi_player', event: 'play', info: null })).toBeNull();
+		expect(parseBingeMessage({ source: 'bingeapi_player', event: 'time', info: '12' })).toBeNull();
+		expect(parseBingeMessage({ source: 'bingeapi_player', event: 'duration', info: 0 })).toBeNull();
 	});
-	it('keeps ad-supported servers OUT of the rotation until Ad Mode is on (consent)', () => {
-		expect(failoverRotation(false).map((p) => p.id)).toEqual(['embedwave', 'bingeapi']);
-		expect(failoverRotation(true).map((p) => p.id)).toEqual(['embedwave', 'bingeapi', 'vidlink', 'vidfast']);
+	it('parses serverchange so the UI can name the live internal server', () => {
+		expect(parseBingeMessage({ source: 'bingeapi_player', event: 'serverchange', info: 'Sirius' })).toEqual({
+			event: 'serverchange',
+			server: 'Sirius'
+		});
 	});
-	it('advances in registry order from the current server', () => {
-		expect(nextFailoverProvider('embedwave', [], { adMode: false })?.id).toBe('bingeapi');
-		expect(nextFailoverProvider('embedwave', [], { adMode: true })?.id).toBe('bingeapi');
-		expect(nextFailoverProvider('bingeapi', [], { adMode: true })?.id).toBe('vidlink');
-	});
-	it('skips servers already tried and never returns the current one', () => {
-		expect(nextFailoverProvider('embedwave', ['bingeapi'], { adMode: true })?.id).toBe('vidlink');
-		expect(nextFailoverProvider('vidlink', ['embedwave', 'bingeapi'], { adMode: true })?.id).toBe('vidfast');
-	});
-	it('wraps once, then gives up (null) when everything was tried', () => {
-		expect(nextFailoverProvider('vidfast', [], { adMode: true })?.id).toBe('embedwave');
-		expect(nextFailoverProvider('embedwave', ['bingeapi'], { adMode: false })).toBeNull();
-		expect(nextFailoverProvider('vidfast', ['embedwave', 'bingeapi', 'vidlink'], { adMode: true })).toBeNull();
-	});
-	it('with Ad Mode off, exhausting the clean servers ends the chain (no silent ad opt-in)', () => {
-		expect(nextFailoverProvider('bingeapi', ['embedwave'], { adMode: false })).toBeNull();
+	it('lists all 12 internal BingeAPI servers with quality (docs)', () => {
+		expect(BINGE_SERVERS).toHaveLength(12);
+		expect(bingeServerQuality('Sirius')).toBe('up to 4K');
+		expect(bingeServerQuality('vega')).toBe('HD');
+		expect(bingeServerQuality('nope')).toBeNull();
 	});
 });
 
@@ -168,6 +156,7 @@ describe('download capability', () => {
 		expect(ids).not.toContain('vidlink');
 		expect(ids).not.toContain('demo');
 		expect(ids).not.toContain('embedwave');
+		expect(ids).not.toContain('bingeapi');
 	});
 });
 

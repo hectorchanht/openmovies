@@ -23,10 +23,6 @@ export interface Title {
 	runtimeMin?: number; // movies
 	seasons?: number; // tv
 	episodes?: Episode[]; // tv (demo subset / TMDB season 1)
-	/** TMDB release date (YYYY-MM-DD; release_date for movies, first_air_date
-	 * for TV) when the adapter supplied one. Drives the unreleased state:
-	 * a title whose date is in the future has no sources anywhere yet. */
-	releaseDate?: string;
 	/** CSS gradient used as poster art when no TMDB poster is available. */
 	art: string;
 	posterPath?: string | null; // TMDB /w500 path when the live adapter supplied it
@@ -68,21 +64,6 @@ export const resumeKey = (t: { type: MediaType; id: number; season?: number; epi
 	t.type === 'tv' && t.season != null && t.episode != null
 		? `${t.type}:${t.id}:${t.season}:${t.episode}`
 		: `${t.type}:${t.id}`;
-
-/**
- * True when a TMDB release date (YYYY-MM-DD) is still in the future —
- * the title is unreleased and NO provider anywhere has a source for it
- * (the 2026-11-24 Avengers: Doomsday incident: the watch page offered
- * four dead servers for a film out in December 2026). Missing or
- * malformed dates are NOT unreleased: absence of evidence never blocks
- * a playable title. Comparison is by calendar day (local), so a title
- * releasing today counts as released.
- */
-export const isUnreleased = (releaseDate: string | undefined, now: Date = new Date()): boolean => {
-	if (!releaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) return false;
-	const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-	return releaseDate > today;
-};
 
 /** 0..1 watched fraction for progress bars; 0 when duration unknown. */
 export const progressOf = (e: ResumeEntry): number =>

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import PosterCard from '$lib/components/PosterCard.svelte';
-	import Icon from '$lib/components/Icon.svelte';
 	import { TmdbCatalog } from '$lib/tmdb';
 	import { continueWatching } from '$lib/personal';
 	import { store } from '$lib/store.svelte';
@@ -69,9 +68,11 @@
 			<p>{featured.overview}</p>
 			<p class="muted small">{featured.year} · ★ {featured.rating.toFixed(1)} · {featured.genres.join(' · ')}</p>
 			<div class="hero-btns">
-				<a class="btn primary ico" href={`/watch/${featured.id}?type=${featured.type}`} aria-label="Play" title="Play"><Icon name="play" /></a>
-				<button class="btn ico" class:on={store.personal.watchlist.includes(featured.id)} onclick={() => store.toggleWatchlist(featured.id)} aria-label={store.personal.watchlist.includes(featured.id) ? 'In My List' : 'Add to My List'} title={store.personal.watchlist.includes(featured.id) ? 'In My List' : 'Add to My List'}><Icon name={store.personal.watchlist.includes(featured.id) ? 'check' : 'bookmark'} /></button>
-				<a class="btn ico" href={`/title/${featured.id}?type=${featured.type}`} aria-label="More info" title="More info"><Icon name="info" /></a>
+				<a class="btn primary" href={`/watch/${featured.id}?type=${featured.type}`}>▶ Play</a>
+				<button class="btn" class:on={store.personal.watchlist.includes(featured.id)} onclick={() => store.toggleWatchlist(featured.id)}>
+					{store.personal.watchlist.includes(featured.id) ? '✓ In My List' : '+ My List'}
+				</button>
+				<a class="btn" href={`/title/${featured.id}?type=${featured.type}`}>More info</a>
 			</div>
 		</div>
 	</section>
@@ -79,12 +80,12 @@
 
 <form class="searchbar" onsubmit={(e) => { e.preventDefault(); void doSearch(); }}>
 	<input type="text" placeholder="Search movies & TV shows…" bind:value={query} aria-label="Search" />
-	<button class="btn primary ico" type="submit" aria-label="Search" title="Search"><Icon name="search" /></button>
+	<button class="btn primary" type="submit">Search</button>
 </form>
 {#if source === 'demo'}<p class="small muted">Showing the demo catalogue — live TMDB data appears here once a TMDB API key is configured. Playback, resume and your lists already work.</p>{/if}
 
 {#if cw.length}
-	<div class="row-head"><h2>Continue Watching</h2><a href="/my" aria-label="My List" title="My List"><Icon name="arrowRight" /></a></div>
+	<div class="row-head"><h2>Continue Watching</h2><a href="/my">My List →</a></div>
 	<div class="scroller">
 		{#each cw as e}{#if byId(e.titleId)}<PosterCard title={byId(e.titleId)!} resume={e} />{/if}{/each}
 	</div>
@@ -95,10 +96,10 @@
 	<div class="scroller">{#each because as t}<PosterCard title={t} />{/each}</div>
 {/if}
 
-<div class="row-head"><h2>Trending Movies</h2><a href="/browse?type=movie" aria-label="Browse all movies" title="Browse all"><Icon name="arrowRight" /></a></div>
+<div class="row-head"><h2>Trending Movies</h2><a href="/browse?type=movie">Browse all →</a></div>
 <div class="scroller">{#each movies as t}<PosterCard title={t} />{/each}</div>
 
-<div class="row-head"><h2>Trending Series</h2><a href="/browse?type=tv" aria-label="Browse all series" title="Browse all"><Icon name="arrowRight" /></a></div>
+<div class="row-head"><h2>Trending Series</h2><a href="/browse?type=tv">Browse all →</a></div>
 <div class="scroller">{#each shows as t}<PosterCard title={t} />{/each}</div>
 
 {#if !searchPool}

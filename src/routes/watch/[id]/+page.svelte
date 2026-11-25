@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import Player from '$lib/components/Player.svelte';
-	import Icon from '$lib/components/Icon.svelte';
 	import PosterCard from '$lib/components/PosterCard.svelte';
 	import { TmdbCatalog } from '$lib/tmdb';
 	import { downloadOptions } from '$lib/providers';
@@ -36,13 +35,17 @@
 	<h1 class="t">{title.name}{#if title.type === 'tv'} <span class="muted">· S{season} E{episode}</span>{/if}</h1>
 	<Player {title} {season} {episode} />
 	<div class="btns">
-		<button class="btn ico" class:on={store.personal.liked.includes(title.id)} onclick={() => title && store.toggleLiked(title.id)} aria-label={store.personal.liked.includes(title.id) ? 'Liked' : 'Like'} title={store.personal.liked.includes(title.id) ? 'Liked' : 'Like'} aria-pressed={store.personal.liked.includes(title.id)}><Icon name="heart" filled={store.personal.liked.includes(title.id)} /></button>
-		<button class="btn ico" class:on={store.personal.watchlist.includes(title.id)} onclick={() => title && store.toggleWatchlist(title.id)} aria-label={store.personal.watchlist.includes(title.id) ? 'In My List' : 'Add to My List'} title={store.personal.watchlist.includes(title.id) ? 'In My List' : 'Add to My List'} aria-pressed={store.personal.watchlist.includes(title.id)}><Icon name={store.personal.watchlist.includes(title.id) ? 'check' : 'bookmark'} /></button>
-		<button class="btn ico" onclick={() => title && store.markWatched(title.id)} aria-label="Mark watched" title="Mark watched"><Icon name="eye" /></button>
+		<button class="btn" class:on={store.personal.liked.includes(title.id)} onclick={() => title && store.toggleLiked(title.id)}>
+			{store.personal.liked.includes(title.id) ? '♥ Liked' : '♡ Like'}
+		</button>
+		<button class="btn" class:on={store.personal.watchlist.includes(title.id)} onclick={() => title && store.toggleWatchlist(title.id)}>
+			{store.personal.watchlist.includes(title.id) ? '✓ In My List' : '+ My List'}
+		</button>
+		<button class="btn" onclick={() => title && store.markWatched(title.id)}>Mark watched</button>
 		{#if title && dlOptions.length}
-			<button class="btn ico" onclick={() => { if (title) { store.recordDownload(title.id); trackEvent('download', title.id); window.open(dlOptions[0].url, '_blank', 'noopener'); } }} aria-label={`Download this ${title.type === 'tv' ? 'episode' : 'movie'} · free`} title="Download · free"><Icon name="download" /></button>
+			<button class="btn" onclick={() => { if (title) { store.recordDownload(title.id); trackEvent('download', title.id); window.open(dlOptions[0].url, '_blank', 'noopener'); } }}>⬇ Download this {title.type === 'tv' ? 'episode' : 'movie'} · free</button>
 		{/if}
-		<a class="btn ico" href={`/title/${title.id}?type=${title.type}`} aria-label="Details" title="Details"><Icon name="info" /></a>
+		<a class="btn" href={`/title/${title.id}?type=${title.type}`}>Details</a>
 	</div>
 	{#if similar.length}
 		<div class="row-head"><h2>More Like This</h2></div>

@@ -41,15 +41,6 @@ describe('TMDB adapter', () => {
 		const t = mapTmdb({ id: 9, name: 'Show', first_air_date: '2021-01-01', vote_average: 8, genres: [{ name: 'Drama' }] }, 'tv');
 		expect(t).toMatchObject({ name: 'Show', year: 2021, genres: ['Drama'] });
 	});
-	it('mapTmdb carries the full release date (drives the unreleased state)', () => {
-		const m = mapTmdb({ id: 1003596, title: 'Future Film', release_date: '2026-12-18', vote_average: 0, genres: [] }, 'movie');
-		expect(m.releaseDate).toBe('2026-12-18');
-		expect(m.year).toBe(2026);
-		const tv = mapTmdb({ id: 9, name: 'Show', first_air_date: '2027-03-01', vote_average: 8, genres: [] }, 'tv');
-		expect(tv.releaseDate).toBe('2027-03-01');
-		const nodate = mapTmdb({ id: 1, title: 'X', vote_average: 1, genres: [] }, 'movie');
-		expect(nodate.releaseDate).toBeUndefined();
-	});
 	it('demo catalogue lists only titles VidLink was verified to carry (carriage audit 2026-11-18)', () => {
 		// VidLink's API returned null ("We Couldn't Find This Content") for
 		// these major titles on 2026-11-18 — they must not come back into

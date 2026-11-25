@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import PosterCard from '$lib/components/PosterCard.svelte';
-	import Icon from '$lib/components/Icon.svelte';
 	import { filterTitles, TmdbCatalog } from '$lib/tmdb';
 	import { ALL_GENRES } from '$lib/demo-data';
 	import type { Title } from '$lib/types';
@@ -26,8 +25,8 @@
 <h1>Browse</h1>
 <div class="filters">
 	<div class="group" role="group" aria-label="Type">
-		{#each [{ v: 'all', label: 'All', icon: 'grid' }, { v: 'movie', label: 'Movies', icon: 'film' }, { v: 'tv', label: 'TV Shows', icon: 'tv' }] as o}
-			<button class="chip ico" class:on={type === o.v} onclick={() => (type = o.v as typeof type)} aria-label={o.label} title={o.label} aria-pressed={type === o.v}><Icon name={o.icon} /></button>
+		{#each ['all', 'movie', 'tv'] as v}
+			<button class="chip" class:on={type === v} onclick={() => (type = v as typeof type)}>{v === 'all' ? 'All' : v === 'movie' ? 'Movies' : 'TV Shows'}</button>
 		{/each}
 	</div>
 	<input type="text" placeholder="Filter by name…" bind:value={query} aria-label="Filter by name" />

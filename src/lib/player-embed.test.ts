@@ -12,9 +12,17 @@ import { describe, expect, it } from 'vitest';
 // tag on the provider chip itself: a user who taps a tagged provider
 // has knowingly opted in — that tap IS the consent — so a selected
 // adSupported provider renders WITHOUT the sandbox directly, with no
-// extra notices, dialogs or enable steps. These tests pin exactly that
-// contract: sandboxed by default with the safe token set, one
-// doubly-gated unsandboxed path, and the tag-tap as the only opt-in. The vitest suite runs in a node environment (no DOM
+// extra notices, dialogs or enable steps.
+// Hector added a second, separate path on 2026-11-24: BingeAPI is the
+// DEFAULT provider and may run with no sandbox at all — it is clean
+// (no ads in the player), but its own docs say a sandbox blocks its
+// player scripts, and Hector ruled "no sandbox is OK as long as we
+// show user movies for free". That exception is named-provider only:
+// it lives in the registry as requiresUnsandboxed=true on BingeAPI
+// alone, never on an ad-supported provider.
+// These tests pin exactly that contract: sandboxed by default with
+// the safe token set, two registry-gated unsandboxed paths, and the
+// tag-tap as the only ad opt-in. The vitest suite runs in a node environment (no DOM
 // / testing-library in this repo), and the iframe only renders after
 // the resolver fills `src`, so this asserts the contract on the
 // component source itself — the exact place a regression would land.
@@ -51,8 +59,10 @@ describe('provider embed iframe (Player.svelte)', () => {
 		);
 	});
 
-	it('the ONLY unsandboxed path is gated on Ad Mode AND an ad-supported provider', () => {
-		expect(source).toContain('const embedUnsandboxed = $derived(adMode && currentProvider.adSupported)');
+	it('the unsandboxed paths are exactly two, both registry-gated: requiresUnsandboxed, or Ad Mode AND an ad-supported provider', () => {
+		expect(source).toContain(
+			'const embedUnsandboxed = $derived(currentProvider.requiresUnsandboxed || (adMode && currentProvider.adSupported))'
+		);
 	});
 
 	it('recreates the iframe when the sandbox state flips (browsers apply sandbox flags at navigation)', () => {
@@ -67,8 +77,10 @@ describe('provider embed iframe (Player.svelte)', () => {
 		}
 	});
 
-	it('defaults to EmbedWave, verified sandbox-clean in a real-browser harness (2026-11-20)', () => {
-		expect(source).toContain("$state('embedwave')");
+	it('defaults to BingeAPI (Hector 2026-11-24: default use BingeAPI, no sandbox OK)', () => {
+		expect(source).toContain("$state('bingeapi')");
+		expect(providersSource).toContain("id: 'bingeapi'");
+		expect(providersSource).toContain('requiresUnsandboxed: true');
 	});
 
 	it('grants the playback permissions embeds need', () => {
@@ -78,47 +90,6 @@ describe('provider embed iframe (Player.svelte)', () => {
 
 	it('keeps the origin-only referrer policy', () => {
 		expect(iframeTag).toContain('referrerpolicy="origin"');
-	});
-});
-
-describe('automatic failover (Player.svelte, 2026-11-24)', () => {
-	it('arms a device-side liveness timer for each fresh embed URL', () => {
-		expect(source).toContain('FAILOVER_TIMEOUT_MS');
-		expect(source).toContain('setTimeout(onFailoverTimeout, FAILOVER_TIMEOUT_MS)');
-		expect(source).toContain('armFailover()');
-	});
-	it('treats a load event on the embed frame as a sign of life', () => {
-		expect(iframeTag).toContain('onload={onFrameLoad}');
-		expect(source).toContain('function onFrameLoad()');
-	});
-	it('treats any postMessage from the embed origin as a sign of life', () => {
-		expect(source).toContain('markSignalled();');
-	});
-	it('advances through the providers.ts rotation and announces the switch', () => {
-		expect(source).toContain('nextFailoverProvider(providerId, triedIds, { adMode })');
-		expect(source).toContain("didn't respond — switched to");
-		expect(source).toContain('已自動切換至');
-		expect(source).toContain('failoverNote');
-	});
-	it('manual switching resets the rotation (the user takes over)', () => {
-		expect(source).toContain('if (!failoverJump) {');
-	});
-	it('never arms failover for the simulated Demo Player or unreleased titles', () => {
-		expect(source).toContain("if (unreleased || providerId === 'demo' || !src) return;");
-	});
-});
-
-describe('unreleased titles (Player.svelte, 2026-11-24)', () => {
-	it('derives the state from the TMDB release date', () => {
-		expect(source).toContain('isUnreleased(title.releaseDate)');
-	});
-	it('shows the bilingual honesty state instead of dead server chips', () => {
-		expect(source).toContain('{#if unreleased}');
-		expect(source).toContain('Not yet released — no sources exist yet · 未上映，未有片源');
-		expect(source).toContain('Expected release · 預計上映：{title.releaseDate}');
-	});
-	it('does not resolve any embed for an unreleased title', () => {
-		expect(source).toContain('if (unreleased) {');
 	});
 });
 

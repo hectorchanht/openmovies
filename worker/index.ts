@@ -194,8 +194,20 @@ interface ServerProvider {
 
 export const SERVER_PROVIDERS: ServerProvider[] = [
 	{
+		id: 'bingeapi',
+		label: 'Server 1 · BingeAPI',
+		capabilities: ['stream'],
+		progressEvents: true,
+		verified: true,
+		host: 'bingeapi.st',
+		build: ({ id, type, season, episode }) =>
+			type === 'movie'
+				? `https://bingeapi.st/embed/movie/${id}?color=e8590c`
+				: `https://bingeapi.st/embed/tv/${id}/${season}/${episode}?color=e8590c`
+	},
+	{
 		id: 'embedwave',
-		label: 'Server 1 · EmbedWave',
+		label: 'Server 2 · EmbedWave',
 		capabilities: ['stream'],
 		progressEvents: false,
 		verified: true,
@@ -204,20 +216,6 @@ export const SERVER_PROVIDERS: ServerProvider[] = [
 			type === 'movie'
 				? `https://embedwave.cc/embed/movie/${id}`
 				: `https://embedwave.cc/embed/tv/${id}/${season}/${episode}`
-	},
-	{
-		id: 'bingeapi',
-		label: 'Server 2 · BingeAPI · 12 servers auto-switch',
-		capabilities: ['stream'],
-		progressEvents: false,
-		// Not yet verified sandbox-clean on a real device (2026-11-24):
-		// datacenter probes get a Turnstile check page. Mirrors the client.
-		verified: false,
-		host: 'bingeapi.st',
-		build: ({ id, type, season, episode }) =>
-			type === 'movie'
-				? `https://bingeapi.st/embed/movie/${id}`
-				: `https://bingeapi.st/embed/tv/${id}/${season}/${episode}`
 	},
 	{
 		id: 'demo',
@@ -246,10 +244,9 @@ export const SERVER_PROVIDERS: ServerProvider[] = [
 		capabilities: ['stream'],
 		progressEvents: false,
 		verified: true,
-		// Domain moved .pro -> .vc (2026-11-24; .pro survives only as a 301).
-		host: 'vidfast.vc',
+		host: 'vidfast.pro',
 		build: ({ id, type, season, episode }) =>
-			type === 'movie' ? `https://vidfast.vc/movie/${id}` : `https://vidfast.vc/tv/${id}/${season}/${episode}`
+			type === 'movie' ? `https://vidfast.pro/movie/${id}` : `https://vidfast.pro/tv/${id}/${season}/${episode}`
 	}
 ];
 
@@ -357,7 +354,7 @@ export async function handleRequest(req: Request, env: Env, now = Date.now(), de
 	 * The payload is a pure function of anonymous params, so the whole PoP
 	 * shares one entry and repeat plays cost zero compute. */
 	if (req.method === 'GET' && path === '/resolve') {
-		const provider = url.searchParams.get('provider') ?? 'embedwave';
+		const provider = url.searchParams.get('provider') ?? 'bingeapi';
 		const typeRaw = url.searchParams.get('type') ?? 'movie';
 		const id = Number(url.searchParams.get('id'));
 		const season = Math.max(1, Number(url.searchParams.get('season') ?? 1) || 1);

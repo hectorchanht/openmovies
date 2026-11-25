@@ -51,6 +51,12 @@ describe('cache keys', () => {
 	});
 
 	it('resolvePayloadFor mirrors the client registry URLs', () => {
+		expect(resolvePayloadFor({ provider: 'bingeapi', type: 'movie', id: 27205, season: 1, episode: 1 })?.embedUrl).toBe(
+			'https://bingeapi.st/embed/movie/27205?color=e8590c'
+		);
+		expect(resolvePayloadFor({ provider: 'bingeapi', type: 'tv', id: 1396, season: 2, episode: 3 })?.embedUrl).toBe(
+			'https://bingeapi.st/embed/tv/1396/2/3?color=e8590c'
+		);
 		expect(resolvePayloadFor({ provider: 'embedwave', type: 'movie', id: 577922, season: 1, episode: 1 })?.embedUrl).toBe(
 			'https://embedwave.cc/embed/movie/577922'
 		);
@@ -61,15 +67,8 @@ describe('cache keys', () => {
 			'https://vidlink.pro/movie/27205?primaryColor=e8590c'
 		);
 		expect(resolvePayloadFor({ provider: 'vidfast', type: 'tv', id: 1396, season: 2, episode: 3 })?.embedUrl).toBe(
-			'https://vidfast.vc/tv/1396/2/3'
+			'https://vidfast.pro/tv/1396/2/3'
 		);
-		expect(resolvePayloadFor({ provider: 'bingeapi', type: 'movie', id: 577922, season: 1, episode: 1 })?.embedUrl).toBe(
-			'https://bingeapi.st/embed/movie/577922'
-		);
-		expect(resolvePayloadFor({ provider: 'bingeapi', type: 'tv', id: 1396, season: 2, episode: 3 })?.embedUrl).toBe(
-			'https://bingeapi.st/embed/tv/1396/2/3'
-		);
-		expect(resolvePayloadFor({ provider: 'bingeapi', type: 'movie', id: 577922, season: 1, episode: 1 })?.verified).toBe(false);
 		expect(resolvePayloadFor({ provider: 'vidfast', type: 'tv', id: 1396, season: 2, episode: 3 })?.downloadUrl).toBeNull();
 		expect(resolvePayloadFor({ provider: 'nope', type: 'movie', id: 1, season: 1, episode: 1 })).toBeNull();
 	});
@@ -83,7 +82,7 @@ describe('GET /resolve — edge cached', () => {
 		expect(r1.status).toBe(200);
 		expect(r1.headers.get('x-om-cache')).toBe('MISS');
 		const body1 = (await r1.json()) as { embedUrl: string; downloadUrl: string | null };
-		expect(body1.embedUrl).toBe('https://vidfast.vc/movie/27205');
+		expect(body1.embedUrl).toBe('https://vidfast.pro/movie/27205');
 		expect(body1.downloadUrl).toBeNull();
 		const stored = [...cache.store.values()][0];
 		expect(stored.cacheControl).toBe(`public, max-age=${RESOLVE_TTL_S}`);
@@ -102,13 +101,13 @@ describe('GET /resolve — edge cached', () => {
 		expect(cache.store.size).toBe(0);
 	});
 
-	it('defaults to EmbedWave (Server 1) when no provider is given', async () => {
+	it('defaults to BingeAPI (Server 1) when no provider is given', async () => {
 		const { env: e, deps } = env(undefined);
 		const r = await handleRequest(get('/resolve?type=movie&id=577922'), e, NOW, deps);
 		expect(r.status).toBe(200);
 		const body = (await r.json()) as { provider: string; embedUrl: string };
-		expect(body.provider).toBe('embedwave');
-		expect(body.embedUrl).toBe('https://embedwave.cc/embed/movie/577922');
+		expect(body.provider).toBe('bingeapi');
+		expect(body.embedUrl).toBe('https://bingeapi.st/embed/movie/577922?color=e8590c');
 	});
 
 	it('works with no Cache API at all (degrades to compute)', async () => {
@@ -141,7 +140,7 @@ describe('GET /providers/health — negative caching', () => {
 		expect(h1.providers.find((p) => p.id === 'vidlink')?.ok).toBe(true);
 		expect(h1.providers.find((p) => p.id === 'demo')?.ok).toBe(true);
 		const probes = fetchMock.mock.calls.length;
-		expect(probes).toBe(4); // 4 hosted providers (bingeapi added 2026-11-24); demo is never probed
+		expect(probes).toBe(4); // 4 hosted providers; demo is never probed
 
 		const r2 = await handleRequest(get('/providers/health'), e, NOW, deps);
 		expect(r2.headers.get('x-om-cache')).toBe('HIT');

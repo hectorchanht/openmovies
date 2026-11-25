@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import PosterCard from '$lib/components/PosterCard.svelte';
-	import Icon from '$lib/components/Icon.svelte';
 	import { TmdbCatalog } from '$lib/tmdb';
 	import { continueWatching } from '$lib/personal';
 	import { achievementsFor } from '$lib/types';
@@ -19,7 +18,7 @@
 
 <h1>My List</h1>
 {#if store.signedIn}
-	<p class="muted small">Signed in as {store.session?.email} — your lists sync across devices and follow you if OpenMovies ever moves home. <button class="chip ico" onclick={() => store.signOut()} aria-label="Sign out" title="Sign out"><Icon name="logout" /></button></p>
+	<p class="muted small">Signed in as {store.session?.email} — your lists sync across devices and follow you if OpenMovies ever moves home. <button class="chip" onclick={() => store.signOut()}>Sign out</button></p>
 {:else}
 	<div class="panel">
 		<strong>Guest mode — this device only.</strong>
@@ -35,7 +34,7 @@
 {/if}
 
 <div class="row-head"><h2>Watchlist</h2></div>
-{#if pick(store.personal.watchlist).length}<div class="grid">{#each pick(store.personal.watchlist) as t}<PosterCard title={t} />{/each}</div>{:else}<p class="muted small">Nothing saved yet — tap the bookmark icon on any title.</p>{/if}
+{#if pick(store.personal.watchlist).length}<div class="grid">{#each pick(store.personal.watchlist) as t}<PosterCard title={t} />{/each}</div>{:else}<p class="muted small">Nothing saved yet — tap “+ My List” on any title.</p>{/if}
 
 <div class="row-head"><h2>Liked</h2></div>
 {#if pick(store.personal.liked).length}<div class="grid">{#each pick(store.personal.liked) as t}<PosterCard title={t} />{/each}</div>{:else}<p class="muted small">Titles you like will live here.</p>{/if}
