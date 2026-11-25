@@ -52,10 +52,10 @@ describe('cache keys', () => {
 
 	it('resolvePayloadFor mirrors the client registry URLs', () => {
 		expect(resolvePayloadFor({ provider: 'bingeapi', type: 'movie', id: 27205, season: 1, episode: 1 })?.embedUrl).toBe(
-			'https://bingeapi.st/embed/movie/27205?color=e8590c'
+			'https://bingeapi.st/embed/movie/27205?color=e8590c&autoplay=1'
 		);
 		expect(resolvePayloadFor({ provider: 'bingeapi', type: 'tv', id: 1396, season: 2, episode: 3 })?.embedUrl).toBe(
-			'https://bingeapi.st/embed/tv/1396/2/3?color=e8590c'
+			'https://bingeapi.st/embed/tv/1396/2/3?color=e8590c&autoplay=1'
 		);
 		expect(resolvePayloadFor({ provider: 'embedwave', type: 'movie', id: 577922, season: 1, episode: 1 })?.embedUrl).toBe(
 			'https://embedwave.cc/embed/movie/577922'
@@ -107,7 +107,7 @@ describe('GET /resolve — edge cached', () => {
 		expect(r.status).toBe(200);
 		const body = (await r.json()) as { provider: string; embedUrl: string };
 		expect(body.provider).toBe('bingeapi');
-		expect(body.embedUrl).toBe('https://bingeapi.st/embed/movie/577922?color=e8590c');
+		expect(body.embedUrl).toBe('https://bingeapi.st/embed/movie/577922?color=e8590c&autoplay=1');
 	});
 
 	it('works with no Cache API at all (degrades to compute)', async () => {

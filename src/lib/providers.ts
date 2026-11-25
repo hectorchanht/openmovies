@@ -130,8 +130,8 @@ export const PROVIDERS: Provider[] = [
 		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
 			type === 'movie'
-				? `https://bingeapi.st/embed/movie/${id}?color=e8590c`
-				: `https://bingeapi.st/embed/tv/${id}/${season}/${episode}?color=e8590c`,
+				? `https://bingeapi.st/embed/movie/${id}?color=e8590c&autoplay=1`
+				: `https://bingeapi.st/embed/tv/${id}/${season}/${episode}?color=e8590c&autoplay=1`,
 		progressEvents: true,
 		adSupported: false,
 		requiresUnsandboxed: true,

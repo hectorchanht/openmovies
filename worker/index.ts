@@ -202,8 +202,8 @@ export const SERVER_PROVIDERS: ServerProvider[] = [
 		host: 'bingeapi.st',
 		build: ({ id, type, season, episode }) =>
 			type === 'movie'
-				? `https://bingeapi.st/embed/movie/${id}?color=e8590c`
-				: `https://bingeapi.st/embed/tv/${id}/${season}/${episode}?color=e8590c`
+				? `https://bingeapi.st/embed/movie/${id}?color=e8590c&autoplay=1`
+				: `https://bingeapi.st/embed/tv/${id}/${season}/${episode}?color=e8590c&autoplay=1`
 	},
 	{
 		id: 'embedwave',

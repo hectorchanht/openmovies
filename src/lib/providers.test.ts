@@ -26,13 +26,13 @@ describe('provider registry', () => {
 	});
 	it('builds BingeAPI URLs from TMDB ids (patterns from bingeapi.com/docs)', () => {
 		expect(providerById('bingeapi').build({ id: 27205, type: 'movie' })).toBe(
-			'https://bingeapi.st/embed/movie/27205?color=e8590c'
+			'https://bingeapi.st/embed/movie/27205?color=e8590c&autoplay=1'
 		);
 		expect(providerById('bingeapi').build({ id: 1396, type: 'tv', season: 1, episode: 1 })).toBe(
-			'https://bingeapi.st/embed/tv/1396/1/1?color=e8590c'
+			'https://bingeapi.st/embed/tv/1396/1/1?color=e8590c&autoplay=1'
 		);
 		expect(providerById('bingeapi').build({ id: 1396, type: 'tv', season: 2, episode: 3 })).toBe(
-			'https://bingeapi.st/embed/tv/1396/2/3?color=e8590c'
+			'https://bingeapi.st/embed/tv/1396/2/3?color=e8590c&autoplay=1'
 		);
 	});
 	it('has BingeAPI FIRST as Server 1 (default, Hector 2026-11-24), EmbedWave second, demo third', () => {

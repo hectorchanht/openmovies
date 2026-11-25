@@ -63,6 +63,18 @@
 		const pid = providerId;
 		const target = { id: title.id, type: title.type, season, episode };
 		const stamp = `${pid}:${target.id}:${target.type}:${season}:${episode}`;
+		// Direct-connect for BingeAPI (Hector 2026-11-24): no intermediate
+		// steps between the user and the player — the embed URL is built
+		// locally and set at once, never waiting on a resolver network
+		// round-trip. Playback behaviour is still recorded (progress
+		// events -> resume + speed measurements below). Other providers
+		// keep the resolver layer (edge cache + local fallback).
+		if (pid === 'bingeapi') {
+			src = providerById('bingeapi').build(target);
+			loadStartedAt = performance.now();
+			playStamp = stamp;
+			return;
+		}
 		void resolveSource(pid, target).then((r) => {
 			if (`${providerId}:${title.id}:${title.type}:${season}:${episode}` === stamp) {
 				src = r.embedUrl;

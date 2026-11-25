@@ -8,7 +8,11 @@
 	const pct = $derived(resume ? Math.round(progressOf(resume) * 100) : 0);
 </script>
 
-<a class="card" href={`/title/${title.id}?type=${title.type}`}>
+<!-- One tap = play (Hector 2026-11-24): a card goes STRAIGHT to the
+     watch page, where the player loads and autoplays — no intermediate
+     detail page, no manual Play step. Details stay one tap away from
+     the watch page's Details button. -->
+<a class="card" href={`/watch/${title.id}?type=${title.type}`}>
 	<div class="poster" style={`background:${title.art}`}>
 		{#if poster}<img src={poster} alt="" loading="lazy" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />{/if}
 		<span class="ptitle">{title.name}</span>
