@@ -244,9 +244,9 @@ export const SERVER_PROVIDERS: ServerProvider[] = [
 		capabilities: ['stream'],
 		progressEvents: false,
 		verified: true,
-		host: 'vidfast.pro',
+		host: 'vidfast.vc',
 		build: ({ id, type, season, episode }) =>
-			type === 'movie' ? `https://vidfast.pro/movie/${id}` : `https://vidfast.pro/tv/${id}/${season}/${episode}`
+			type === 'movie' ? `https://vidfast.vc/movie/${id}` : `https://vidfast.vc/tv/${id}/${season}/${episode}`
 	}
 ];
 

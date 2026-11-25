@@ -122,3 +122,68 @@ describe('Ad Mode (Player.svelte)', () => {
 		expect(source).toContain('We earn nothing from these ads');
 	});
 });
+
+describe('automatic failover (Player.svelte, 2026-11-24, restored)', () => {
+	it('arms a device-side liveness timer for each fresh embed URL', () => {
+		expect(source).toContain('FAILOVER_TIMEOUT_MS');
+		expect(source).toContain('setTimeout(onFailoverTimeout, FAILOVER_TIMEOUT_MS)');
+		expect(source).toContain('armFailover()');
+	});
+	it('treats a load event on the embed frame as a sign of life', () => {
+		expect(iframeTag).toContain('onload={onFrameLoad}');
+		expect(source).toContain('function onFrameLoad()');
+	});
+	it('treats any postMessage from the embed origin as a sign of life', () => {
+		expect(source).toContain('markSignalled();');
+	});
+	it('advances through the providers.ts rotation and announces the switch', () => {
+		expect(source).toContain('nextFailoverProvider(providerId, triedIds, { adMode })');
+		expect(source).toContain("didn't respond — switched to");
+		expect(source).toContain('已自動切換至');
+		expect(source).toContain('failoverNote');
+	});
+	it('manual switching resets the rotation (the user takes over)', () => {
+		expect(source).toContain('if (!failoverJump) {');
+	});
+	it('never arms failover for the simulated Demo Player or unreleased titles', () => {
+		expect(source).toContain("if (unreleased || providerId === 'demo' || !src) return;");
+	});
+});
+
+describe('unreleased titles (Player.svelte, 2026-11-24, restored)', () => {
+	it('derives the state from the TMDB release date', () => {
+		expect(source).toContain('isUnreleased(title.releaseDate)');
+	});
+	it('shows the bilingual honesty state instead of dead server chips', () => {
+		expect(source).toContain('{#if unreleased}');
+		expect(source).toContain('Not yet released — no sources exist yet · 未上映，未有片源');
+		expect(source).toContain('Expected release · 預計上映：{title.releaseDate}');
+	});
+	it('does not resolve any embed for an unreleased title', () => {
+		expect(source).toContain('if (unreleased) {');
+	});
+});
+
+describe('speed transparency — device probe is primary (Player.svelte, ruling 2)', () => {
+	it('probes provider origins from the device at page load', () => {
+		expect(source).toContain('probeDeviceLatency');
+		expect(source).toContain('deviceProbes');
+	});
+	it('passes the device probes into the chip speed labels', () => {
+		expect(source).toContain('chipSpeedLabel(p.id, healthList, measurements, deviceProbes)');
+	});
+});
+
+describe('cover-flight embed warming (flight.ts + PosterCard, ruling 4)', () => {
+	const cardSource = readFileSync(new URL('./components/PosterCard.svelte', import.meta.url), 'utf8');
+	const flightSource = readFileSync(new URL('./flight.ts', import.meta.url), 'utf8');
+	it('the card tap starts the embed warming in parallel with the flight', () => {
+		expect(cardSource).toContain('warmEmbed');
+		expect(cardSource).toContain('flightEmbedUrlFor');
+		expect(cardSource).toContain('store.startFlight');
+	});
+	it('the warm-up loads the default provider embed URL for the tapped title', () => {
+		expect(flightSource).toContain("providerById('bingeapi').build");
+		expect(flightSource).toContain('warmEmbed');
+	});
+});

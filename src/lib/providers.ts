@@ -20,6 +20,9 @@ import { DEMO_TITLES } from './demo-data';
  *              the same day (player + <video> element, including for
  *              titles VidLink lacks). Progress-event support is NOT
  *              verified, so progressEvents stays false.
+ *              DOMAIN UPDATE (2026-11-24): vidfast.pro now 301-redirects
+ *              to vidfast.vc — the adapter points at .vc directly rather
+ *              than depending on the redirect surviving.
  * - demo     — our own simulated player. Always works; used for demo rows
  *              and as the honest fallback when nothing else loads.
  *
@@ -134,6 +137,11 @@ export const PROVIDERS: Provider[] = [
 				: `https://bingeapi.st/embed/tv/${id}/${season}/${episode}?color=e8590c&autoplay=1`,
 		progressEvents: true,
 		adSupported: false,
+		// THE one-line kill switch for the no-sandbox exception (Hector
+		// 2026-11-24): if BingeAPI ever serves popunders/redirects, flip
+		// requiresUnsandboxed to false here and it is sandboxed again;
+		// demotion is moving this entry down the PROVIDERS array. No
+		// other code needs to change — Player.svelte reads only this flag.
 		requiresUnsandboxed: true,
 		verified: true
 	},
@@ -179,7 +187,7 @@ export const PROVIDERS: Provider[] = [
 		label: 'Server 5 · VidFast · 有廣告 Ads',
 		capabilities: ['stream'],
 		build: ({ id, type, season = 1, episode = 1 }) =>
-			type === 'movie' ? `https://vidfast.pro/movie/${id}` : `https://vidfast.pro/tv/${id}/${season}/${episode}`,
+			type === 'movie' ? `https://vidfast.vc/movie/${id}` : `https://vidfast.vc/tv/${id}/${season}/${episode}`,
 		progressEvents: false,
 		adSupported: true,
 		requiresUnsandboxed: false,
@@ -211,11 +219,55 @@ export const providerById = (id: string): Provider => PROVIDERS.find((p) => p.id
  * point providers routinely block, and which says nothing about a real
  * user's device) failed to confirm the host. Probe data must NEVER be
  * rendered as "down", and the player must never skip a server because of
- * it: servers are tried in listed order, and the user switches manually.
+ * it. (The player's automatic failover is a separate mechanism driven by
+ * the USER'S OWN device failing to get any sign of life from an embed —
+ * never by this probe. See nextFailoverProvider.)
  */
 export function providerMarker(p: { id: string; verified: boolean }, unconfirmedIds: readonly string[]): string {
 	if (p.id === 'demo') return '';
 	return !p.verified || unconfirmedIds.includes(p.id) ? ' · unverified' : '';
+}
+
+/**
+ * How long the player waits for ANY sign of life from a freshly loaded
+ * embed (iframe load event, or a postMessage from the embed's origin)
+ * before auto-advancing to the next server. Generous on purpose: real
+ * providers can take several seconds to scan their sources, and a false
+ * advance costs the user their server; a dead one costs only this wait.
+ */
+export const FAILOVER_TIMEOUT_MS = 15_000;
+
+/**
+ * The automatic-failover rotation, in registry order. Two exclusions,
+ * both honesty/consent rules:
+ * - the Demo Player is never auto-advanced INTO — it is simulated, so
+ *   landing there would fake a success; it stays manually selectable.
+ * - ad-supported providers join ONLY when Ad Mode is already on — the
+ *   user's earlier chip tap was the opt-in; auto-advance must never be
+ *   the thing that first renders an unsandboxed ad embed.
+ * The rotation starts from the default (BingeAPI, Server 1) and walks
+ * the registry from wherever the user currently is.
+ */
+export function failoverRotation(adMode: boolean): Provider[] {
+	return PROVIDERS.filter((p) => p.id !== 'demo' && (adMode || !p.adSupported));
+}
+
+/**
+ * Next server to try after `currentId` shows no sign of life, or null
+ * when every candidate has been tried. Walks the rotation starting
+ * AFTER the current provider (wrapping once), skipping ids in `tried`.
+ * Pure — Player.svelte owns the timer and the switching.
+ */
+export function nextFailoverProvider(
+	currentId: string,
+	tried: readonly string[],
+	opts: { adMode: boolean }
+): Provider | null {
+	const order = failoverRotation(opts.adMode);
+	if (!order.length) return null;
+	const start = order.findIndex((p) => p.id === currentId);
+	const seq = start >= 0 ? [...order.slice(start + 1), ...order.slice(0, start)] : order;
+	return seq.find((p) => !tried.includes(p.id) && p.id !== currentId) ?? null;
 }
 
 /**

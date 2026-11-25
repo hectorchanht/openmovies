@@ -67,7 +67,7 @@ describe('cache keys', () => {
 			'https://vidlink.pro/movie/27205?primaryColor=e8590c'
 		);
 		expect(resolvePayloadFor({ provider: 'vidfast', type: 'tv', id: 1396, season: 2, episode: 3 })?.embedUrl).toBe(
-			'https://vidfast.pro/tv/1396/2/3'
+			'https://vidfast.vc/tv/1396/2/3'
 		);
 		expect(resolvePayloadFor({ provider: 'vidfast', type: 'tv', id: 1396, season: 2, episode: 3 })?.downloadUrl).toBeNull();
 		expect(resolvePayloadFor({ provider: 'nope', type: 'movie', id: 1, season: 1, episode: 1 })).toBeNull();
@@ -82,7 +82,7 @@ describe('GET /resolve — edge cached', () => {
 		expect(r1.status).toBe(200);
 		expect(r1.headers.get('x-om-cache')).toBe('MISS');
 		const body1 = (await r1.json()) as { embedUrl: string; downloadUrl: string | null };
-		expect(body1.embedUrl).toBe('https://vidfast.pro/movie/27205');
+		expect(body1.embedUrl).toBe('https://vidfast.vc/movie/27205');
 		expect(body1.downloadUrl).toBeNull();
 		const stored = [...cache.store.values()][0];
 		expect(stored.cacheControl).toBe(`public, max-age=${RESOLVE_TTL_S}`);

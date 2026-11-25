@@ -3,6 +3,7 @@ import { checkDomain, normalizeHost } from './checker';
 import { filterTitles, genreMapFromList, mapTmdb, TmdbCatalog } from './tmdb';
 import { DEMO_TITLES } from './demo-data';
 import { BUILTIN_TRACKS, opensubtitlesSearchUrl, searchSubtitles } from './subtitles';
+import { isUnreleased } from './types';
 
 describe('domain checker', () => {
 	it('normalises URLs to hosts', () => {
@@ -40,6 +41,15 @@ describe('TMDB adapter', () => {
 	it('mapTmdb handles tv naming and genre objects', () => {
 		const t = mapTmdb({ id: 9, name: 'Show', first_air_date: '2021-01-01', vote_average: 8, genres: [{ name: 'Drama' }] }, 'tv');
 		expect(t).toMatchObject({ name: 'Show', year: 2021, genres: ['Drama'] });
+	});
+	it('mapTmdb carries the full release date (drives the unreleased state)', () => {
+		const m = mapTmdb({ id: 1003596, title: 'Future Film', release_date: '2026-12-18', vote_average: 0, genres: [] }, 'movie');
+		expect(m.releaseDate).toBe('2026-12-18');
+		expect(m.year).toBe(2026);
+		const tv = mapTmdb({ id: 9, name: 'Show', first_air_date: '2027-03-01', vote_average: 8, genres: [] }, 'tv');
+		expect(tv.releaseDate).toBe('2027-03-01');
+		const nodate = mapTmdb({ id: 1, title: 'X', vote_average: 1, genres: [] }, 'movie');
+		expect(nodate.releaseDate).toBeUndefined();
 	});
 	it('demo catalogue lists only titles VidLink was verified to carry (carriage audit 2026-11-18)', () => {
 		// VidLink's API returned null ("We Couldn't Find This Content") for
@@ -199,5 +209,22 @@ describe('subtitles adapter', () => {
 	it('builds an OpenSubtitles search URL and degrades to built-in tracks without a key', async () => {
 		expect(opensubtitlesSearchUrl({ tmdbId: 1396, type: 'tv', season: 1, episode: 2 })).toContain('tmdb_id=1396');
 		expect(await searchSubtitles({ tmdbId: 1, type: 'movie' })).toEqual(BUILTIN_TRACKS);
+	});
+});
+
+describe('isUnreleased (unreleased honesty state, 2026-11-24, restored)', () => {
+	const now = new Date(2026, 10, 24); // 2026-11-24 local
+	it('a future release date is unreleased (the Doomsday case)', () => {
+		expect(isUnreleased('2026-12-16', now)).toBe(true);
+		expect(isUnreleased('2027-03-01', now)).toBe(true);
+	});
+	it('today and the past count as released', () => {
+		expect(isUnreleased('2026-11-24', now)).toBe(false);
+		expect(isUnreleased('2020-05-01', now)).toBe(false);
+	});
+	it('missing or malformed dates never block a title', () => {
+		expect(isUnreleased(undefined, now)).toBe(false);
+		expect(isUnreleased('', now)).toBe(false);
+		expect(isUnreleased('Dec 2026', now)).toBe(false);
 	});
 });

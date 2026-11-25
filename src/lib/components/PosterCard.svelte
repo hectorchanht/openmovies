@@ -2,6 +2,7 @@
 	import { posterUrl } from '$lib/tmdb';
 	import { progressOf } from '$lib/types';
 	import { store } from '$lib/store.svelte';
+	import { flightEmbedUrlFor, warmEmbed } from '$lib/flight';
 	import type { ResumeEntry, Title } from '$lib/types';
 
 	let { title, resume }: { title: Title; resume?: ResumeEntry } = $props();
@@ -9,8 +10,11 @@
 	const pct = $derived(resume ? Math.round(progressOf(resume) * 100) : 0);
 
 	/** Cover-flight: remember this card's cover rectangle so the watch
-	 * page can fly the same cover to full screen over the loading player. */
+	 * page can fly the same cover to full screen over the loading player.
+	 * The same tap ALSO starts the fastest source loading (warmEmbed):
+	 * the embed load runs in parallel with the flight, not after it. */
 	function onTap(e: MouseEvent) {
+		warmEmbed(flightEmbedUrlFor(title, { season: resume?.season, episode: resume?.episode }));
 		const el = (e.currentTarget as HTMLElement).querySelector('.poster');
 		const r = el?.getBoundingClientRect();
 		if (!r) return;

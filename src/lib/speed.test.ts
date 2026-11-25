@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
 	chipSpeedLabel,
 	connectionTier,
+	deviceProbesToHealth,
 	fastestProviderId,
 	formatMs,
 	playTier,
+	probeDeviceLatency,
 	readMeasurements,
 	recordMeasurement,
 	type SpeedStorage
@@ -68,6 +70,45 @@ describe('device measurements', () => {
 			' · 2.6s 開播'
 		);
 		expect(chipSpeedLabel('demo', health, {})).toBe('');
-		expect(chipSpeedLabel('vidlink', [], {})).toBe('');
+	});
+	it('an unmeasured provider shows the neutral 未測 state — never a fabricated number (ruling 2)', () => {
+		expect(chipSpeedLabel('vidlink', [], {})).toBe(' · 未測');
+		expect(chipSpeedLabel('vidlink', [{ id: 'vidlink', ok: false, latencyMs: 90 }], {})).toBe(' · 未測');
+		expect(chipSpeedLabel('vidlink', [], {}, { vidlink: null })).toBe(' · 未測');
+	});
+});
+
+describe('device connection probe (ruling 2 — device-side is primary)', () => {
+	it('chip label prefers the DEVICE probe over the edge probe', () => {
+		const health = [{ id: 'bingeapi', ok: true, latencyMs: 210 }];
+		expect(chipSpeedLabel('bingeapi', health, {}, { bingeapi: 120 })).toBe(' · 120ms');
+		// a failed device probe (null) falls back to the edge number
+		expect(chipSpeedLabel('bingeapi', health, {}, { bingeapi: null })).toBe(' · 210ms');
+		// device time-to-play still outranks both once it exists
+		expect(
+			chipSpeedLabel('bingeapi', health, { bingeapi: { loadMs: 900, playMs: 2600, updatedAt: 1 } }, { bingeapi: 120 })
+		).toBe(' · 2.6s 開播');
+	});
+	it('probeDeviceLatency times the fetch on the injected clock', async () => {
+		const ticks = [1000, 1240];
+		const now = () => ticks.shift() ?? 1240;
+		const okFetch = async () => ({});
+		await expect(probeDeviceLatency('https://bingeapi.st/favicon.ico', okFetch, now)).resolves.toBe(240);
+	});
+	it('probeDeviceLatency returns null (not measured) when the probe fails or times out', async () => {
+		const failFetch = async () => {
+			throw new Error('network down');
+		};
+		await expect(probeDeviceLatency('https://x.example/favicon.ico', failFetch, () => 0)).resolves.toBeNull();
+		const hangFetch = () => new Promise(() => {});
+		await expect(probeDeviceLatency('https://x.example/favicon.ico', hangFetch, () => 0, 5)).resolves.toBeNull();
+	});
+	it('deviceProbesToHealth keeps only answered probes — a failed probe is unmeasured, never "down"', () => {
+		const rows = deviceProbesToHealth({ bingeapi: 120, embedwave: null, vidlink: 340 });
+		expect(rows).toEqual([
+			{ id: 'bingeapi', ok: true, latencyMs: 120 },
+			{ id: 'vidlink', ok: true, latencyMs: 340 }
+		]);
+		expect(fastestProviderId(rows)).toBe('bingeapi');
 	});
 });
