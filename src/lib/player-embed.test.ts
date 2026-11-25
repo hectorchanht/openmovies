@@ -174,6 +174,20 @@ describe('speed transparency — device probe is primary (Player.svelte, ruling 
 	});
 });
 
+describe('watch page — loading never lies (Wave 1 hang fix)', () => {
+	const watch = readFileSync('src/routes/watch/[id]/+page.svelte', 'utf8');
+	it('a failed catalog lookup shows an honest error + retry, not eternal "Loading player…"', () => {
+		expect(watch).toContain('loadFailed');
+		expect(watch).toContain('{:else if loadFailed}');
+		expect(watch).toContain('Retry · 重試');
+		expect(watch).toContain("Couldn't load this title");
+	});
+	it('the retry re-runs the same load path (one function, one path)', () => {
+		expect(watch).toContain('void loadTitle()');
+		expect(watch).toContain('function retryLoad()');
+	});
+});
+
 describe('cover-flight embed warming (flight.ts + PosterCard, ruling 4)', () => {
 	const cardSource = readFileSync(new URL('./components/PosterCard.svelte', import.meta.url), 'utf8');
 	const flightSource = readFileSync(new URL('./flight.ts', import.meta.url), 'utf8');

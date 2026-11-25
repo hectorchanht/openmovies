@@ -28,6 +28,30 @@
 	let flightGone = $state(false);
 	let flightFallback: ReturnType<typeof setTimeout> | undefined;
 
+	let loadFailed = $state(false);
+	let loadArgs = $state<{ id: number; type: 'movie' | 'tv' } | null>(null);
+
+	// Loading must never lie: when the catalog lookup fails (offline,
+	// TMDB hiccup), detail() returns null — the page says so and offers
+	// a retry. An eternal "Loading player…" is exactly how
+	// /watch/1003596 hung in Wave 1 even though the unreleased logic
+	// itself was fine.
+	async function loadTitle() {
+		if (!loadArgs) return;
+		loadFailed = false;
+		title = await catalog.detail(loadArgs.id, loadArgs.type);
+		if (title) {
+			trackEvent('play', title.id);
+			similar = await catalog.similar(title);
+		} else {
+			loadFailed = true;
+		}
+	}
+	function retryLoad() {
+		title = null;
+		void loadTitle();
+	}
+
 	function dismissFlight() {
 		if (!flight || flightGone) return;
 		flightGone = true;
@@ -51,11 +75,8 @@
 		} else if (f) {
 			store.clearFlight();
 		}
-		title = await catalog.detail(id, type);
-		if (title) {
-			trackEvent('play', title.id);
-			similar = await catalog.similar(title);
-		}
+		loadArgs = { id, type };
+		void loadTitle();
 	});
 </script>
 
@@ -94,12 +115,19 @@
 		<div class="row-head"><h2>More Like This</h2></div>
 		<div class="scroller">{#each similar as t}<PosterCard title={t} />{/each}</div>
 	{/if}
+{:else if loadFailed}
+	<div class="loadfail">
+		<p>Couldn't load this title — check your connection and try again.<br />載入唔到呢套戲，請檢查連線再試。</p>
+		<button class="btn" onclick={retryLoad}>Retry · 重試</button>
+	</div>
 {:else}
 	<p class="muted">Loading player…</p>
 {/if}
 
 <style>
 	.t { font-size: 22px; letter-spacing: -0.01em; }
+	.loadfail { margin-top: 18px; }
+	.loadfail p { color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
 	.t .muted { font-size: 16px; }
 	.btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 	.flight {
