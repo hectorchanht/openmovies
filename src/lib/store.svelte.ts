@@ -11,6 +11,22 @@ export interface Session {
 }
 
 /**
+ * Cover-flight transition (Hector 2026-11-24): when a poster card is
+ * tapped, its cover's on-screen rectangle is remembered here; the
+ * watch page then animates that same cover from the card's position
+ * to full screen WHILE the player underneath is already loading the
+ * fastest source — when the flight lands, the movie is playing.
+ */
+export interface PosterFlight {
+	titleId: number;
+	art: string;
+	poster: string | null;
+	name: string;
+	rect: { x: number; y: number; w: number; h: number };
+	ts: number;
+}
+
+/**
  * Runes singleton for the personal layer + session (OpenMusic store pattern).
  * userId = signed-in email, else 'guest'. Guest data lives on-device only;
  * signing in merges guest data into the account and syncs to the API Worker
@@ -20,6 +36,14 @@ class AppStore {
 	personal = $state<PersonalState>(emptyPersonal());
 	session = $state<Session | null>(null);
 	loaded = $state(false);
+	flight = $state<PosterFlight | null>(null);
+
+	startFlight(f: PosterFlight) {
+		this.flight = f;
+	}
+	clearFlight() {
+		this.flight = null;
+	}
 
 	get userId(): string {
 		return this.session?.email ?? 'guest';

@@ -10,7 +10,12 @@
 	import { resumeKey } from '$lib/types';
 	import type { Title } from '$lib/types';
 
-	let { title, season = 1, episode = 1 }: { title: Title; season?: number; episode?: number } = $props();
+	let {
+		title,
+		season = 1,
+		episode = 1,
+		onFirstPlay
+	}: { title: Title; season?: number; episode?: number; onFirstPlay?: () => void } = $props();
 
 	// Default is BingeAPI (Hector ruling 2026-11-24): the BingeBang
 	// player as an embed — free, no ads, 12 servers with automatic
@@ -122,10 +127,11 @@
 	 * started playing on this device; time it once per embed load. */
 	function noteFirstPlay() {
 		if (!loadStartedAt || !playStamp) return;
-		const stamp = playStamp;
 		playStamp = '';
 		measurements = recordMeasurement(measurements, providerId, { playMs: performance.now() - loadStartedAt }, Date.now());
-		void stamp;
+		// The cover-flight overlay on the watch page listens for this:
+		// the movie is playing, so the cover can land and fade away.
+		onFirstPlay?.();
 	}
 
 	function switchTo(id: string) {

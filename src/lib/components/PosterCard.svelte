@@ -1,18 +1,35 @@
 <script lang="ts">
 	import { posterUrl } from '$lib/tmdb';
 	import { progressOf } from '$lib/types';
+	import { store } from '$lib/store.svelte';
 	import type { ResumeEntry, Title } from '$lib/types';
 
 	let { title, resume }: { title: Title; resume?: ResumeEntry } = $props();
 	const poster = $derived(posterUrl(title));
 	const pct = $derived(resume ? Math.round(progressOf(resume) * 100) : 0);
+
+	/** Cover-flight: remember this card's cover rectangle so the watch
+	 * page can fly the same cover to full screen over the loading player. */
+	function onTap(e: MouseEvent) {
+		const el = (e.currentTarget as HTMLElement).querySelector('.poster');
+		const r = el?.getBoundingClientRect();
+		if (!r) return;
+		store.startFlight({
+			titleId: title.id,
+			art: title.art,
+			poster,
+			name: title.name,
+			rect: { x: r.x, y: r.y, w: r.width, h: r.height },
+			ts: Date.now()
+		});
+	}
 </script>
 
 <!-- One tap = play (Hector 2026-11-24): a card goes STRAIGHT to the
      watch page, where the player loads and autoplays — no intermediate
      detail page, no manual Play step. Details stay one tap away from
      the watch page's Details button. -->
-<a class="card" href={`/watch/${title.id}?type=${title.type}`}>
+<a class="card" href={`/watch/${title.id}?type=${title.type}`} onclick={onTap}>
 	<div class="poster" style={`background:${title.art}`}>
 		{#if poster}<img src={poster} alt="" loading="lazy" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />{/if}
 		<span class="ptitle">{title.name}</span>
