@@ -116,6 +116,18 @@ print("worker bundle bytes:", len(worker_js))
 # A mint failure raises and aborts: never upload a bindings set without it.
 resend_key = mint_resend_key()
 
+# --- TMDB key (Hector gave it 2026-11-20; stored for reuse in
+# .deploy-secrets.json per his 2026-11-24 rule: what he gives must be
+# remembered and reusable next time). An upload rebuilds ALL bindings,
+# so the TMDB secret must ride along here or every API deploy silently
+# drops it. Env wins; the stored file is the fallback. Never printed. ---
+tmdb_key = os.environ.get("TMDB_API_KEY", "")
+if not tmdb_key and os.path.exists(SECRETS_FILE):
+    try:
+        tmdb_key = json.load(open(SECRETS_FILE)).get("TMDB_API_KEY", "")
+    except Exception:
+        tmdb_key = ""
+
 # --- upload worker (multipart: metadata + module) ---
 bindings = [
     {"type": "d1", "name": "DB", "database_id": db_id},
@@ -123,6 +135,11 @@ bindings = [
     {"type": "plain_text", "name": "MAIL_FROM", "text": "OpenMovies <login@dawnstudio.app>"},
     {"type": "secret_text", "name": "RESEND_API_KEY", "text": resend_key},
 ]
+if tmdb_key:
+    bindings.append({"type": "secret_text", "name": "TMDB_API_KEY", "text": tmdb_key})
+    print("TMDB_API_KEY binding included (from stored secrets, value withheld)")
+else:
+    print("WARNING: no TMDB_API_KEY available - worker TMDB proxy will stay unconfigured")
 print("RESEND_API_KEY binding included (freshly minted)")
 metadata = {"main_module": "index.js", "bindings": bindings, "compatibility_date": "2026-06-05"}
 boundary = "----omw" + pysecrets.token_hex(8)

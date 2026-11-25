@@ -28,6 +28,18 @@ API_BASE = "https://openmovies-api.dawnstudio.app"
 # if it is unset the deploy ABORTS rather than shipping the demo catalogue.
 TMDB_KEY = os.environ.get("PUBLIC_TMDB_API_KEY", "")
 if not TMDB_KEY:
+    # Reuse what Hector already gave (2026-11-20), stored for exactly
+    # this purpose in .deploy-secrets.json (0600, gitignored) per his
+    # 2026-11-24 rule: what he gives must be remembered and reusable
+    # next time - never ask again for a key that is already on file.
+    try:
+        with open(os.path.join(ROOT, ".deploy-secrets.json")) as f:
+            TMDB_KEY = json.load(f).get("TMDB_API_KEY", "")
+        if TMDB_KEY:
+            print("PUBLIC_TMDB_API_KEY loaded from stored secrets (value withheld)")
+    except Exception:
+        TMDB_KEY = ""
+if not TMDB_KEY:
     raise SystemExit(
         "ABORT: PUBLIC_TMDB_API_KEY is not set in the environment — the web "
         "bundle would fall back to the demo catalogue. Refusing to deploy.")
